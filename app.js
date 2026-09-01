@@ -692,11 +692,19 @@ document.getElementById('btnLogout').addEventListener('click', () => {
 
 document.getElementById('loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const u = document.getElementById('loginUsername').value;
-    const p = document.getElementById('loginPassword').value;
+    const u = document.getElementById('loginUsername').value.trim();
+    const p = document.getElementById('loginPassword').value.trim();
     
     try {
-        Swal.showLoading();
+        Swal.fire({
+            title: 'Memproses...',
+            text: 'Sedang memverifikasi login...',
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
+        });
+
         const res = await sql`SELECT * FROM users WHERE username = ${u} AND password = ${p}`;
         Swal.close();
         
@@ -704,12 +712,30 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
             currentUser = res[0];
             localStorage.setItem('pmii_user', JSON.stringify(currentUser));
             document.getElementById('loginForm').reset();
+            
+            Swal.fire({
+                icon: 'success',
+                title: 'Login Berhasil!',
+                text: `Selamat datang, ${currentUser.username}`,
+                timer: 1200,
+                showConfirmButton: false
+            });
+            
             checkAuthAndRoute();
         } else {
-            Swal.fire('Error', 'Username atau password salah', 'error');
+            Swal.fire({
+                icon: 'error',
+                title: 'Gagal Masuk',
+                text: 'Username atau password salah. Silakan coba lagi.'
+            });
         }
     } catch (err) {
-        Swal.fire('Error', 'Gagal menghubungi database', 'error');
+        console.error('Login error:', err);
+        Swal.fire({
+            icon: 'error',
+            title: 'Koneksi Gagal',
+            text: 'Gagal menghubungi database: ' + (err.message || 'Error tidak diketahui')
+        });
     }
 });
 
@@ -726,18 +752,18 @@ const renderBeritaList = () => {
     const publicContainer = document.getElementById('publicNewsList');
     const adminContainer = document.getElementById('adminNewsList');
     
-    publicContainer.innerHTML = '';
-    adminContainer.innerHTML = '';
+    if (publicContainer) publicContainer.innerHTML = '';
+    if (adminContainer) adminContainer.innerHTML = '';
 
     if (beritaList.length === 0) {
-        publicContainer.innerHTML = '<p class="text-center text-sm text-gray-500 py-4">Belum ada berita dipublikasikan.</p>';
-        adminContainer.innerHTML = '<p class="text-center text-sm text-gray-500 py-4">Belum ada berita.</p>';
+        if (publicContainer) publicContainer.innerHTML = '<p class="text-center text-sm text-gray-500 py-4">Belum ada berita dipublikasikan.</p>';
+        if (adminContainer) adminContainer.innerHTML = '<p class="text-center text-sm text-gray-500 py-4">Belum ada berita.</p>';
         return;
     }
 
     beritaList.forEach(b => {
         // Public list (hanya PUBLISHED)
-        if (b.status === 'PUBLISHED') {
+        if (b.status === 'PUBLISHED' && publicContainer) {
             publicContainer.innerHTML += `
                 <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
                     <h4 class="font-bold text-gray-800 text-lg">${b.judul}</h4>
@@ -748,15 +774,17 @@ const renderBeritaList = () => {
         }
         
         // Admin list
-        adminContainer.innerHTML += `
-            <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-start">
-                <div>
-                    <h4 class="font-bold text-gray-800">${b.judul}</h4>
-                    <span class="text-[10px] font-bold px-2 py-1 rounded mt-1 inline-block ${b.status === 'PUBLISHED' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}">${b.status}</span>
+        if (adminContainer) {
+            adminContainer.innerHTML += `
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-start">
+                    <div>
+                        <h4 class="font-bold text-gray-800">${b.judul}</h4>
+                        <span class="text-[10px] font-bold px-2 py-1 rounded mt-1 inline-block ${b.status === 'PUBLISHED' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}">${b.status}</span>
+                    </div>
+                    <button onclick="hapusBerita('${b.id}')" class="text-red-500 p-2"><i class="fa-solid fa-trash"></i></button>
                 </div>
-                <button onclick="hapusBerita('${b.id}')" class="text-red-500 p-2"><i class="fa-solid fa-trash"></i></button>
-            </div>
-        `;
+            `;
+        }
     });
 };
 
@@ -787,7 +815,7 @@ document.getElementById('btnBuatBerita').addEventListener('click', async () => {
 
     if (formValues) {
         try {
-            await sql`INSERT INTO berita (judul, isi, status, author) VALUES (${formValues.judul}, ${formValues.isi}, ${formValues.status}, ${currentUser.username})`;
+            await sql`INSERT INTO berita (judul, isi, status, author) VALUES (${formValues.judul}, ${formValues.isi}, ${formValues.status}, ${currentUser?.username || 'Admin'})`;
             Swal.fire('Berhasil', 'Berita disimpan', 'success');
             fetchBerita();
         } catch (err) { Swal.fire('Error', 'Gagal menyimpan', 'error'); }
@@ -806,9 +834,13 @@ const initDB = async () => {
     if (!sql) return;
     try {
         await sql`CREATE TABLE IF NOT EXISTS users (id UUID DEFAULT gen_random_uuid() PRIMARY KEY, username VARCHAR(50) UNIQUE NOT NULL, password VARCHAR(100) NOT NULL, role VARCHAR(20) NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`;
+    } catch(e) {}
+    try {
         await sql`INSERT INTO users (username, password, role) VALUES ('superadmin', 'admin123', 'super_admin'), ('bendahara', 'bendahara123', 'bendahara'), ('narator', 'narator123', 'narator') ON CONFLICT (username) DO NOTHING`;
+    } catch(e) {}
+    try {
         await sql`CREATE TABLE IF NOT EXISTS berita (id UUID DEFAULT gen_random_uuid() PRIMARY KEY, judul VARCHAR(255) NOT NULL, isi TEXT NOT NULL, gambar_base64 TEXT, status VARCHAR(20) DEFAULT 'DRAFT', author VARCHAR(50), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, published_at TIMESTAMP)`;
-    } catch(e) { console.error('DB Init Error', e); }
+    } catch(e) {}
 };
 
 const init = async () => {
