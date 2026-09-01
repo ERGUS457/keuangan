@@ -1,73 +1,28 @@
 import { sql } from './neon-config.js';
 
-// --- State ---
-let transactions = [];
+// ===================== STATE =====================
+let kasTransactions = [];    // transaksi kas umum (kegiatan_id IS NULL)
+let kegiatanList = [];       // daftar kegiatan
+let kegTransactions = [];    // transaksi kegiatan aktif
+let activeKegiatanId = null; // kegiatan yang sedang dibuka
+let activeKegiatanData = null;
 let currentImageBase64 = null;
 let currentActiveTxId = null;
-let dashboardPeriod = 'all'; // all | week | month | year
-let historyPeriod = 'all';   // all | week | month | year
+let kasPeriod = 'all';
 
-// --- DOM Elements ---
-const views = document.querySelectorAll('.view-section');
-const navBtns = document.querySelectorAll('.nav-btn');
+// ===================== FORMATTERS =====================
+const formatRupiah = (n) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n);
+const formatDate = (d) => { if (!d) return '-'; return new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }); };
 
-const txtTotalSaldo = document.getElementById('txtTotalSaldo');
-const txtTotalMasuk = document.getElementById('txtTotalMasuk');
-const txtTotalKeluar = document.getElementById('txtTotalKeluar');
-const recentTxList = document.getElementById('recentTxList');
-const historyTxList = document.getElementById('historyTxList');
-
-const txForm = document.getElementById('txForm');
-const typeBtns = document.querySelectorAll('.type-btn');
-const inputType = document.getElementById('inputType');
-const inputNominal = document.getElementById('inputNominal');
-const inputJudul = document.getElementById('inputJudul');
-const inputKategori = document.getElementById('inputKategori');
-const inputTanggal = document.getElementById('inputTanggal');
-const inputCatatan = document.getElementById('inputCatatan');
-
-const inputFileGallery = document.getElementById('inputFileGallery');
-const inputFileCamera = document.getElementById('inputFileCamera');
-const previewContainer = document.getElementById('previewContainer');
-const imgPreview = document.getElementById('imgPreview');
-const btnRemoveImage = document.getElementById('btnRemoveImage');
-
-const btnSubmitTx = document.getElementById('btnSubmitTx');
-const btnSubmitText = document.getElementById('btnSubmitText');
-const spinnerSubmit = document.getElementById('spinnerSubmit');
-const btnExport = document.getElementById('btnExport');
-
-const txModal = document.getElementById('txModal');
-const txModalContent = document.getElementById('txModalContent');
-const btnCloseModal = document.getElementById('btnCloseModal');
-const btnDeleteTx = document.getElementById('btnDeleteTx');
-const modalImageContainer = document.getElementById('modalImageContainer');
-
-// --- Formatters ---
-const formatRupiah = (angka) => {
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
-};
-
-const formatDate = (dateString) => {
-    if (!dateString) return '-';
-    const options = { day: 'numeric', month: 'short', year: 'numeric' };
-    return new Date(dateString).toLocaleDateString('id-ID', options);
-};
-
-// --- Filter Helper ---
 const filterByPeriod = (list, period) => {
     if (period === 'all') return list;
-    const now = new Date();
-    now.setHours(23, 59, 59, 999);
+    const now = new Date(); now.setHours(23,59,59,999);
     let cutoff = new Date();
     if (period === 'week') cutoff.setDate(now.getDate() - 7);
     else if (period === 'month') cutoff.setMonth(now.getMonth() - 1);
     else if (period === 'year') cutoff.setFullYear(now.getFullYear() - 1);
-    cutoff.setHours(0, 0, 0, 0);
-    return list.filter(tx => {
-        const d = new Date(tx.tanggal);
-        return d >= cutoff && d <= now;
-    });
+    cutoff.setHours(0,0,0,0);
+    return list.filter(tx => { const d = new Date(tx.tanggal); return d >= cutoff && d <= now; });
 };
 
 const activateFilterBtn = (container, activeBtn) => {
@@ -79,284 +34,416 @@ const activateFilterBtn = (container, activeBtn) => {
     activeBtn.classList.add('bg-primary', 'text-white', 'shadow-sm', 'active-filter');
 };
 
-// Dashboard filter buttons
-document.querySelectorAll('.filter-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-        dashboardPeriod = e.currentTarget.dataset.period;
-        activateFilterBtn(e.currentTarget.parentElement, e.currentTarget);
-        renderDashboard();
-    });
-});
+// ===================== NAVIGATION =====================
+const views = document.querySelectorAll('.view-section');
+const navBtns = document.querySelectorAll('.nav-btn');
+const mainHeader = document.getElementById('mainHeader');
+const detailHeader = document.getElementById('detailHeader');
+const bottomNav = document.getElementById('bottomNav');
 
-// History filter buttons
-document.querySelectorAll('.history-filter-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-        historyPeriod = e.currentTarget.dataset.period;
-        activateFilterBtn(e.currentTarget.parentElement, e.currentTarget);
-        renderHistory();
-    });
-});
+const showView = (viewId) => {
+    views.forEach(v => v.classList.remove('active'));
+    document.getElementById(viewId).classList.add('active');
+};
 
-// --- Navigation ---
+const showMainLayout = () => {
+    mainHeader.classList.remove('hidden');
+    detailHeader.classList.add('hidden');
+    bottomNav.classList.remove('hidden');
+};
+
+const showDetailLayout = () => {
+    mainHeader.classList.add('hidden');
+    detailHeader.classList.remove('hidden');
+    bottomNav.classList.add('hidden');
+};
+
 navBtns.forEach(btn => {
     btn.addEventListener('click', (e) => {
         const navBtn = e.currentTarget;
         const targetId = navBtn.getAttribute('data-target');
         if (!targetId) return;
-        
-        // Update view
-        views.forEach(v => v.classList.remove('active'));
-        document.getElementById(targetId).classList.add('active');
-        
-        // Update bottom nav styling
+
+        // If clicking FAB (+), open form for Kas Umum
+        if (targetId === 'viewForm') {
+            openFormForKasUmum();
+            return;
+        }
+
+        showMainLayout();
+        showView(targetId);
+
         navBtns.forEach(n => {
-            if (n.classList.contains('bg-primary')) return; // keep FAB styled
-            n.classList.remove('text-primary');
-            n.classList.add('text-gray-400');
+            if (n.classList.contains('bg-primary')) return;
+            n.classList.remove('text-primary'); n.classList.add('text-gray-400');
         });
-        
         if (!navBtn.classList.contains('bg-primary')) {
-            navBtn.classList.add('text-primary');
-            navBtn.classList.remove('text-gray-400');
+            navBtn.classList.add('text-primary'); navBtn.classList.remove('text-gray-400');
         }
     });
 });
 
-document.getElementById('btnViewAll').addEventListener('click', () => {
-    document.querySelector('[data-target="viewHistory"]').click();
-});
-
-// --- Form Logic ---
-typeBtns.forEach(btn => {
+// ===================== FILTER BUTTONS =====================
+document.querySelectorAll('.kas-filter-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
-        const type = btn.dataset.type;
-        inputType.value = type;
-        
-        typeBtns.forEach(b => {
-            b.classList.remove('bg-white', 'shadow', 'text-success', 'text-danger');
-            b.classList.add('text-gray-500');
-        });
-        
-        btn.classList.add('bg-white', 'shadow');
-        btn.classList.remove('text-gray-500');
-        if(type === 'in') btn.classList.add('text-success');
-        else btn.classList.add('text-danger');
+        kasPeriod = e.currentTarget.dataset.period;
+        activateFilterBtn(e.currentTarget.parentElement, e.currentTarget);
+        renderKasUmum();
     });
 });
 
-// Auto format nominal input
-inputNominal.addEventListener('input', function(e) {
-    let value = this.value.replace(/[^0-9]/g, '');
-    if (value !== '') {
-        this.value = new Intl.NumberFormat('id-ID').format(parseInt(value));
+// ===================== FORM LOGIC =====================
+const txForm = document.getElementById('txForm');
+const typeBtns = document.querySelectorAll('.type-btn');
+const inputType = document.getElementById('inputType');
+const inputNominal = document.getElementById('inputNominal');
+const inputJudul = document.getElementById('inputJudul');
+const inputKategori = document.getElementById('inputKategori');
+const inputTanggal = document.getElementById('inputTanggal');
+const inputCatatan = document.getElementById('inputCatatan');
+const inputKegiatanId = document.getElementById('inputKegiatanId');
+const previewContainer = document.getElementById('previewContainer');
+const imgPreview = document.getElementById('imgPreview');
+const btnRemoveImage = document.getElementById('btnRemoveImage');
+const btnSubmitTx = document.getElementById('btnSubmitTx');
+const btnSubmitText = document.getElementById('btnSubmitText');
+const spinnerSubmit = document.getElementById('spinnerSubmit');
+
+typeBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+        const type = btn.dataset.type;
+        inputType.value = type;
+        typeBtns.forEach(b => { b.classList.remove('bg-white', 'shadow', 'text-success', 'text-danger'); b.classList.add('text-gray-500'); });
+        btn.classList.add('bg-white', 'shadow'); btn.classList.remove('text-gray-500');
+        if (type === 'in') btn.classList.add('text-success'); else btn.classList.add('text-danger');
+    });
+});
+
+inputNominal.addEventListener('input', function() {
+    let v = this.value.replace(/[^0-9]/g, '');
+    if (v !== '') this.value = new Intl.NumberFormat('id-ID').format(parseInt(v));
+});
+
+inputTanggal.valueAsDate = new Date();
+
+// Open form for Kas Umum
+const openFormForKasUmum = () => {
+    inputKegiatanId.value = '';
+    document.getElementById('formTitle').textContent = 'Catat Kas Umum';
+    showMainLayout();
+    showView('viewForm');
+};
+
+// Open form for Kegiatan
+const openFormForKegiatan = (kegId, kegNama) => {
+    inputKegiatanId.value = kegId;
+    document.getElementById('formTitle').textContent = `Catat: ${kegNama}`;
+    showDetailLayout();
+    showView('viewForm');
+};
+
+document.getElementById('btnBackFromForm').addEventListener('click', () => {
+    if (inputKegiatanId.value) {
+        // Go back to detail kegiatan
+        openDetailKegiatan(inputKegiatanId.value);
+    } else {
+        showMainLayout();
+        showView('viewKasUmum');
     }
 });
 
-// Set default date to today
-inputTanggal.valueAsDate = new Date();
-
-// --- Image Handling (Compress & Preview) ---
+// ===================== IMAGE HANDLING =====================
 const handleImageSelect = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.readAsDataURL(file);
-    reader.onload = (event) => {
+    reader.onload = (ev) => {
         const img = new Image();
-        img.src = event.target.result;
+        img.src = ev.target.result;
         img.onload = () => {
-            // Compress Image (Neon does not have storage, so we compress heavily and save as Base64)
             const canvas = document.createElement('canvas');
-            const MAX_WIDTH = 500; // Smaller max width for base64 storage
-            const MAX_HEIGHT = 500;
-            let width = img.width;
-            let height = img.height;
-
-            if (width > height) {
-                if (width > MAX_WIDTH) {
-                    height *= MAX_WIDTH / width;
-                    width = MAX_WIDTH;
-                }
-            } else {
-                if (height > MAX_HEIGHT) {
-                    width *= MAX_HEIGHT / height;
-                    height = MAX_HEIGHT;
-                }
-            }
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, width, height);
-            
-            // 50% quality to save space in DB
-            currentImageBase64 = canvas.toDataURL('image/jpeg', 0.5); 
-            
-            // Show preview
+            const MAX = 500;
+            let w = img.width, h = img.height;
+            if (w > h) { if (w > MAX) { h *= MAX / w; w = MAX; } }
+            else { if (h > MAX) { w *= MAX / h; h = MAX; } }
+            canvas.width = w; canvas.height = h;
+            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+            currentImageBase64 = canvas.toDataURL('image/jpeg', 0.5);
             imgPreview.src = currentImageBase64;
             previewContainer.classList.remove('hidden');
         };
     };
 };
 
-inputFileGallery.addEventListener('change', handleImageSelect);
-inputFileCamera.addEventListener('change', handleImageSelect);
-
+document.getElementById('inputFileGallery').addEventListener('change', handleImageSelect);
+document.getElementById('inputFileCamera').addEventListener('change', handleImageSelect);
 btnRemoveImage.addEventListener('click', () => {
-    currentImageBase64 = null;
-    imgPreview.src = '';
+    currentImageBase64 = null; imgPreview.src = '';
     previewContainer.classList.add('hidden');
-    inputFileGallery.value = '';
-    inputFileCamera.value = '';
+    document.getElementById('inputFileGallery').value = '';
+    document.getElementById('inputFileCamera').value = '';
 });
 
-// --- Submit Transaction ---
+// ===================== SUBMIT TRANSACTION =====================
 txForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    
     const nominalRaw = parseInt(inputNominal.value.replace(/[^0-9]/g, ''));
-    if (isNaN(nominalRaw) || nominalRaw <= 0) {
-        Swal.fire('Error', 'Nominal tidak valid', 'error');
-        return;
-    }
+    if (isNaN(nominalRaw) || nominalRaw <= 0) { Swal.fire('Error', 'Nominal tidak valid', 'error'); return; }
+
+    const kegId = inputKegiatanId.value || null;
 
     try {
-        btnSubmitTx.disabled = true;
-        btnSubmitText.textContent = 'Menyimpan...';
-        spinnerSubmit.classList.remove('hidden');
+        btnSubmitTx.disabled = true; btnSubmitText.textContent = 'Menyimpan...'; spinnerSubmit.classList.remove('hidden');
 
-        // Check if DB is configured
         if (!sql) {
-            // Mock Saving for demonstration
-            setTimeout(() => {
-                Swal.fire('Info', 'Simulasi berhasil! Setup Connection String Neon di neon-config.js untuk menyimpan data sebenarnya.', 'info');
-                resetForm();
-                document.querySelector('[data-target="viewDashboard"]').click();
-            }, 1000);
+            setTimeout(() => { Swal.fire('Info', 'Simulasi berhasil!', 'info'); resetForm(); }, 1000);
             return;
         }
 
-        // Save to Neon Postgres DB
         await sql`
-            INSERT INTO transaksi (type, nominal, judul, kategori, tanggal, catatan, image_base64) 
-            VALUES (
-                ${inputType.value}, 
-                ${nominalRaw}, 
-                ${inputJudul.value}, 
-                ${inputKategori.value}, 
-                ${inputTanggal.value}, 
-                ${inputCatatan.value}, 
-                ${currentImageBase64}
-            )
+            INSERT INTO transaksi (type, nominal, judul, kategori, tanggal, catatan, image_base64, kegiatan_id) 
+            VALUES (${inputType.value}, ${nominalRaw}, ${inputJudul.value}, ${inputKategori.value}, ${inputTanggal.value}, ${inputCatatan.value}, ${currentImageBase64}, ${kegId})
         `;
 
-        Swal.fire({
-            icon: 'success',
-            title: 'Berhasil',
-            text: 'Transaksi berhasil disimpan!',
-            timer: 1500,
-            showConfirmButton: false
-        });
-
+        Swal.fire({ icon: 'success', title: 'Berhasil', text: 'Transaksi berhasil disimpan!', timer: 1500, showConfirmButton: false });
         resetForm();
-        document.querySelector('[data-target="viewDashboard"]').click();
 
-        // Refresh data manually after inserting
-        await fetchDataManual();
-
+        if (kegId) {
+            await fetchKegiatanTransactions(kegId);
+            openDetailKegiatan(kegId);
+        } else {
+            await fetchKasUmum();
+            showMainLayout();
+            showView('viewKasUmum');
+        }
     } catch (error) {
-        console.error("Error adding document: ", error);
-        Swal.fire('Error', 'Gagal menyimpan transaksi: ' + (error.message || 'Unknown error'), 'error');
+        console.error(error);
+        Swal.fire('Error', 'Gagal menyimpan: ' + (error.message || ''), 'error');
     } finally {
-        btnSubmitTx.disabled = false;
-        btnSubmitText.textContent = 'Simpan Transaksi';
-        spinnerSubmit.classList.add('hidden');
+        btnSubmitTx.disabled = false; btnSubmitText.textContent = 'Simpan Transaksi'; spinnerSubmit.classList.add('hidden');
     }
 });
 
 const resetForm = () => {
-    txForm.reset();
-    inputNominal.value = '';
-    inputTanggal.valueAsDate = new Date();
-    btnRemoveImage.click();
+    txForm.reset(); inputNominal.value = ''; inputTanggal.valueAsDate = new Date();
+    currentImageBase64 = null; imgPreview.src = ''; previewContainer.classList.add('hidden');
+    document.getElementById('inputFileGallery').value = ''; document.getElementById('inputFileCamera').value = '';
+    // Reset type buttons
+    typeBtns.forEach(b => { b.classList.remove('bg-white', 'shadow', 'text-success', 'text-danger'); b.classList.add('text-gray-500'); });
+    typeBtns[0].classList.add('bg-white', 'shadow', 'text-success'); typeBtns[0].classList.remove('text-gray-500');
+    inputType.value = 'in';
 };
 
-// --- Fetch Data ---
-const fetchDataManual = async () => {
+// ===================== FETCH DATA =====================
+const fetchKasUmum = async () => {
     if (!sql) {
-        // Mock data
-        transactions = [
-            { id: '1', type: 'in', nominal: 1500000, judul: 'Dana Sponsor', kategori: 'Sponsorship', tanggal: '2023-08-10', catatan: '' },
-            { id: '2', type: 'out', nominal: 350000, judul: 'Beli Konsumsi Rapat', kategori: 'Konsumsi', tanggal: '2023-08-12', catatan: 'Nasi kotak 10 porsi' }
+        kasTransactions = [
+            { id: '1', type: 'in', nominal: 500000, judul: 'Iuran Bulan Agustus', kategori: 'Iuran Anggota', tanggal: '2026-08-15', catatan: '10 orang' },
+            { id: '2', type: 'out', nominal: 150000, judul: 'ATK Sekretariat', kategori: 'Perlengkapan', tanggal: '2026-08-20', catatan: '' },
         ];
-        renderDashboard();
-        renderHistory();
+        renderKasUmum(); return;
+    }
+    try {
+        kasTransactions = await sql`SELECT * FROM transaksi WHERE kegiatan_id IS NULL ORDER BY tanggal DESC, created_at DESC` || [];
+        renderKasUmum();
+    } catch (err) { console.error(err); }
+};
+
+const fetchKegiatanList = async () => {
+    if (!sql) {
+        kegiatanList = [
+            { id: 'mock1', nama: 'Seminar Nasional 2026', deskripsi: 'Acara tahunan', tanggal_mulai: '2026-09-01', tanggal_selesai: '2026-09-03' },
+        ];
+        renderKegiatanList(); return;
+    }
+    try {
+        kegiatanList = await sql`SELECT * FROM kegiatan ORDER BY created_at DESC` || [];
+        renderKegiatanList();
+    } catch (err) { console.error(err); }
+};
+
+const fetchKegiatanTransactions = async (kegId) => {
+    if (!sql) {
+        kegTransactions = [
+            { id: 'mock-k1', type: 'in', nominal: 2000000, judul: 'Dana Sponsor', kategori: 'Sponsorship', tanggal: '2026-09-01', catatan: 'PT ABC' },
+        ];
         return;
     }
+    try {
+        kegTransactions = await sql`SELECT * FROM transaksi WHERE kegiatan_id = ${kegId} ORDER BY tanggal DESC, created_at DESC` || [];
+    } catch (err) { console.error(err); }
+};
+
+// ===================== RENDER KAS UMUM =====================
+const renderKasUmum = () => {
+    const filtered = filterByPeriod(kasTransactions, kasPeriod);
+    let totalIn = 0, totalOut = 0;
+    filtered.forEach(tx => { if (tx.type === 'in') totalIn += Number(tx.nominal); else totalOut += Number(tx.nominal); });
+
+    document.getElementById('txtKasSaldo').textContent = formatRupiah(totalIn - totalOut);
+    document.getElementById('txtKasMasuk').textContent = formatRupiah(totalIn);
+    document.getElementById('txtKasKeluar').textContent = formatRupiah(totalOut);
+
+    const list = document.getElementById('kasUmumTxList');
+    list.innerHTML = '';
+    if (filtered.length === 0) { list.innerHTML = '<div class="text-center text-gray-400 py-6 italic text-sm">Tidak ada transaksi di periode ini</div>'; return; }
+    filtered.forEach(tx => list.appendChild(createTxElement(tx)));
+};
+
+// ===================== RENDER KEGIATAN LIST =====================
+const renderKegiatanList = () => {
+    const container = document.getElementById('kegiatanList');
+    container.innerHTML = '';
+    if (kegiatanList.length === 0) {
+        container.innerHTML = '<div class="text-center text-gray-400 py-10 italic text-sm">Belum ada kegiatan. Buat kegiatan baru!</div>';
+        return;
+    }
+    kegiatanList.forEach(keg => {
+        const card = document.createElement('div');
+        card.className = "bg-white rounded-xl p-4 shadow-sm border border-gray-100 active:bg-gray-50 transition cursor-pointer";
+        const dateRange = keg.tanggal_mulai ? `${formatDate(keg.tanggal_mulai)}${keg.tanggal_selesai ? ' - ' + formatDate(keg.tanggal_selesai) : ''}` : 'Tanggal belum diatur';
+        card.innerHTML = `
+            <div class="flex justify-between items-start">
+                <div class="flex items-start space-x-3">
+                    <div class="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0 mt-0.5">
+                        <i class="fa-solid fa-calendar-check"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-gray-800">${keg.nama}</h3>
+                        <p class="text-[11px] text-gray-500 mt-0.5"><i class="fa-regular fa-calendar mr-1"></i>${dateRange}</p>
+                        ${keg.deskripsi ? `<p class="text-xs text-gray-400 mt-1 line-clamp-1">${keg.deskripsi}</p>` : ''}
+                    </div>
+                </div>
+                <i class="fa-solid fa-chevron-right text-gray-300 mt-2"></i>
+            </div>
+        `;
+        card.addEventListener('click', () => openDetailKegiatan(keg.id));
+        container.appendChild(card);
+    });
+};
+
+// ===================== DETAIL KEGIATAN =====================
+const openDetailKegiatan = async (kegId) => {
+    activeKegiatanId = kegId;
+    activeKegiatanData = kegiatanList.find(k => k.id === kegId);
+    if (!activeKegiatanData) { await fetchKegiatanList(); activeKegiatanData = kegiatanList.find(k => k.id === kegId); }
+
+    document.getElementById('detailHeaderTitle').textContent = activeKegiatanData?.nama || 'Kegiatan';
+    const dateRange = activeKegiatanData?.tanggal_mulai ? `${formatDate(activeKegiatanData.tanggal_mulai)}${activeKegiatanData.tanggal_selesai ? ' - ' + formatDate(activeKegiatanData.tanggal_selesai) : ''}` : '';
+    document.getElementById('detailHeaderDate').textContent = dateRange;
+
+    const descContainer = document.getElementById('kegDeskripsiContainer');
+    if (activeKegiatanData?.deskripsi) {
+        document.getElementById('kegDeskripsi').textContent = activeKegiatanData.deskripsi;
+        descContainer.classList.remove('hidden');
+    } else {
+        descContainer.classList.add('hidden');
+    }
+
+    await fetchKegiatanTransactions(kegId);
+    renderKegiatanDetail();
+    showDetailLayout();
+    showView('viewDetailKegiatan');
+};
+
+const renderKegiatanDetail = () => {
+    let totalIn = 0, totalOut = 0;
+    kegTransactions.forEach(tx => { if (tx.type === 'in') totalIn += Number(tx.nominal); else totalOut += Number(tx.nominal); });
+
+    document.getElementById('txtKegSaldo').textContent = formatRupiah(totalIn - totalOut);
+    document.getElementById('txtKegMasuk').textContent = formatRupiah(totalIn);
+    document.getElementById('txtKegKeluar').textContent = formatRupiah(totalOut);
+
+    const list = document.getElementById('kegTxList');
+    list.innerHTML = '';
+    if (kegTransactions.length === 0) { list.innerHTML = '<div class="text-center text-gray-400 py-6 italic text-sm">Belum ada transaksi di kegiatan ini</div>'; return; }
+    kegTransactions.forEach(tx => list.appendChild(createTxElement(tx)));
+};
+
+document.getElementById('btnAddTxKegiatan').addEventListener('click', () => {
+    if (!activeKegiatanId || !activeKegiatanData) return;
+    openFormForKegiatan(activeKegiatanId, activeKegiatanData.nama);
+});
+
+document.getElementById('btnBackFromDetail').addEventListener('click', () => {
+    activeKegiatanId = null; activeKegiatanData = null;
+    showMainLayout();
+    showView('viewKegiatan');
+});
+
+// ===================== BUAT KEGIATAN =====================
+document.getElementById('btnBuatKegiatan').addEventListener('click', async () => {
+    const { value: formValues } = await Swal.fire({
+        title: 'Buat Kegiatan Baru',
+        html: `
+            <input id="swalNama" class="swal2-input" placeholder="Nama Kegiatan" style="font-size:14px">
+            <input id="swalDesc" class="swal2-input" placeholder="Deskripsi (opsional)" style="font-size:14px">
+            <div style="display:flex;gap:8px;padding:0 1.6em;">
+                <input id="swalStart" type="date" class="swal2-input" style="font-size:13px;margin:0.5em 0;flex:1" placeholder="Mulai">
+                <input id="swalEnd" type="date" class="swal2-input" style="font-size:13px;margin:0.5em 0;flex:1" placeholder="Selesai">
+            </div>
+        `,
+        focusConfirm: false,
+        showCancelButton: true,
+        confirmButtonText: 'Buat',
+        cancelButtonText: 'Batal',
+        confirmButtonColor: '#3b82f6',
+        preConfirm: () => {
+            const nama = document.getElementById('swalNama').value;
+            if (!nama) { Swal.showValidationMessage('Nama kegiatan wajib diisi'); return false; }
+            return {
+                nama,
+                deskripsi: document.getElementById('swalDesc').value,
+                tanggal_mulai: document.getElementById('swalStart').value || null,
+                tanggal_selesai: document.getElementById('swalEnd').value || null
+            };
+        }
+    });
+
+    if (!formValues) return;
+
+    if (!sql) { Swal.fire('Info', 'Simulasi berhasil!', 'info'); return; }
 
     try {
-        const result = await sql`SELECT * FROM transaksi ORDER BY tanggal DESC, created_at DESC`;
-        transactions = result || [];
-        renderDashboard();
-        renderHistory();
-    } catch (error) {
-        console.error('Error fetching data:', error);
+        await sql`INSERT INTO kegiatan (nama, deskripsi, tanggal_mulai, tanggal_selesai) VALUES (${formValues.nama}, ${formValues.deskripsi}, ${formValues.tanggal_mulai}, ${formValues.tanggal_selesai})`;
+        Swal.fire({ icon: 'success', title: 'Berhasil', text: 'Kegiatan berhasil dibuat!', timer: 1500, showConfirmButton: false });
+        await fetchKegiatanList();
+    } catch (err) {
+        console.error(err);
+        Swal.fire('Error', 'Gagal membuat kegiatan', 'error');
     }
-};
+});
 
-// --- Render UI ---
-const renderDashboard = () => {
-    const filtered = filterByPeriod(transactions, dashboardPeriod);
-    let totalIn = 0;
-    let totalOut = 0;
-
-    filtered.forEach(tx => {
-        if (tx.type === 'in') totalIn += Number(tx.nominal);
-        else totalOut += Number(tx.nominal);
+// ===================== HAPUS KEGIATAN =====================
+document.getElementById('btnDeleteKegiatan').addEventListener('click', async () => {
+    if (!activeKegiatanId) return;
+    const result = await Swal.fire({
+        title: 'Hapus Kegiatan?',
+        text: 'Semua transaksi di dalam kegiatan ini juga akan terhapus!',
+        icon: 'warning', showCancelButton: true,
+        confirmButtonColor: '#ef4444', cancelButtonColor: '#9ca3af',
+        confirmButtonText: 'Ya, Hapus!', cancelButtonText: 'Batal'
     });
+    if (!result.isConfirmed) return;
+    if (!sql) { Swal.fire('Terhapus', 'Simulasi berhasil', 'success'); return; }
+    try {
+        await sql`DELETE FROM kegiatan WHERE id = ${activeKegiatanId}`;
+        Swal.fire('Terhapus!', 'Kegiatan telah dihapus.', 'success');
+        activeKegiatanId = null; activeKegiatanData = null;
+        showMainLayout(); showView('viewKegiatan');
+        await fetchKegiatanList();
+    } catch (err) { console.error(err); Swal.fire('Error', 'Gagal menghapus', 'error'); }
+});
 
-    const saldo = totalIn - totalOut;
-
-    txtTotalSaldo.textContent = formatRupiah(saldo);
-    txtTotalMasuk.textContent = formatRupiah(totalIn);
-    txtTotalKeluar.textContent = formatRupiah(totalOut);
-
-    // Recent 5 transactions (filtered)
-    recentTxList.innerHTML = '';
-    const recent = filtered.slice(0, 5);
-    
-    if (recent.length === 0) {
-        recentTxList.innerHTML = '<div class="text-center text-gray-400 py-4 italic text-sm">Tidak ada transaksi di periode ini</div>';
-        return;
-    }
-
-    recent.forEach(tx => {
-        recentTxList.appendChild(createTxElement(tx));
-    });
-};
-
-const renderHistory = () => {
-    const filtered = filterByPeriod(transactions, historyPeriod);
-    historyTxList.innerHTML = '';
-    if (filtered.length === 0) {
-        historyTxList.innerHTML = '<div class="text-center text-gray-400 py-10 italic">Tidak ada transaksi di periode ini</div>';
-        return;
-    }
-    
-    filtered.forEach(tx => {
-        historyTxList.appendChild(createTxElement(tx));
-    });
-};
-
+// ===================== TX ELEMENT =====================
 const createTxElement = (tx) => {
     const div = document.createElement('div');
     div.className = "bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center active:bg-gray-50 transition cursor-pointer";
-    
     const isMasuk = tx.type === 'in';
     const iconClass = isMasuk ? 'fa-arrow-down text-success bg-green-50' : 'fa-arrow-up text-danger bg-red-50';
     const sign = isMasuk ? '+' : '-';
     const textColor = isMasuk ? 'text-success' : 'text-gray-800';
-
     div.innerHTML = `
         <div class="flex items-center space-x-3 overflow-hidden">
             <div class="w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${iconClass}">
@@ -371,38 +458,32 @@ const createTxElement = (tx) => {
             <p class="font-bold text-sm ${textColor}">${sign}${formatRupiah(tx.nominal)}</p>
         </div>
     `;
-
     div.addEventListener('click', () => openDetailModal(tx));
     return div;
 };
 
-// --- Modal Detail ---
+// ===================== MODAL DETAIL =====================
+const txModal = document.getElementById('txModal');
+const txModalContent = document.getElementById('txModalContent');
+const modalImageContainer = document.getElementById('modalImageContainer');
+
 const openDetailModal = (tx) => {
     currentActiveTxId = tx.id;
     const isMasuk = tx.type === 'in';
-    
     document.getElementById('modalBadge').textContent = isMasuk ? 'Pemasukan' : 'Pengeluaran';
     document.getElementById('modalBadge').className = `text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide ${isMasuk ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`;
-    
     document.getElementById('modalJudul').textContent = tx.judul;
     document.getElementById('modalKategori').innerHTML = `<i class="fa-solid fa-tag"></i> ${tx.kategori}`;
     document.getElementById('modalTanggal').textContent = formatDate(tx.tanggal);
-    
     document.getElementById('modalNominal').textContent = formatRupiah(tx.nominal);
     document.getElementById('modalNominal').className = `text-xl font-extrabold ${isMasuk ? 'text-green-600' : 'text-red-600'}`;
-    
     document.getElementById('modalCatatan').textContent = tx.catatan || '-';
 
     const imgEl = document.getElementById('modalImage');
     const noImgEl = document.getElementById('modalNoImage');
-    const overlay = document.getElementById('modalImageOverlay');
 
     if (tx.image_base64) {
-        imgEl.src = tx.image_base64;
-        imgEl.classList.remove('hidden');
-        noImgEl.classList.add('hidden');
-        
-        // Setup zoom functionality
+        imgEl.src = tx.image_base64; imgEl.classList.remove('hidden'); noImgEl.classList.add('hidden');
         modalImageContainer.onclick = () => {
             document.getElementById('zoomedImage').src = tx.image_base64;
             document.getElementById('btnDownloadImage').href = tx.image_base64;
@@ -410,146 +491,156 @@ const openDetailModal = (tx) => {
             document.getElementById('imageZoomModal').classList.add('flex');
         };
     } else {
-        imgEl.src = '';
-        imgEl.classList.add('hidden');
-        noImgEl.classList.remove('hidden');
+        imgEl.src = ''; imgEl.classList.add('hidden'); noImgEl.classList.remove('hidden');
         modalImageContainer.onclick = null;
-        overlay.classList.add('hidden'); // hide zoom icon
     }
 
     txModal.classList.add('active');
-    setTimeout(() => {
-        txModalContent.classList.remove('scale-95', 'opacity-0');
-        txModalContent.classList.add('scale-100', 'opacity-100');
-    }, 10);
+    setTimeout(() => { txModalContent.classList.remove('scale-95', 'opacity-0'); txModalContent.classList.add('scale-100', 'opacity-100'); }, 10);
 };
 
-btnCloseModal.addEventListener('click', () => {
+document.getElementById('btnCloseModal').addEventListener('click', () => {
     txModalContent.classList.remove('scale-100', 'opacity-100');
     txModalContent.classList.add('scale-95', 'opacity-0');
-    setTimeout(() => {
-        txModal.classList.remove('active');
-    }, 200);
+    setTimeout(() => { txModal.classList.remove('active'); }, 200);
 });
 
-// Close zoom modal
 document.getElementById('btnCloseZoom').addEventListener('click', () => {
     document.getElementById('imageZoomModal').classList.add('hidden');
     document.getElementById('imageZoomModal').classList.remove('flex');
 });
 
-// --- Delete Transaction ---
-btnDeleteTx.addEventListener('click', async () => {
+// ===================== DELETE TX =====================
+document.getElementById('btnDeleteTx').addEventListener('click', async () => {
     if (!currentActiveTxId) return;
-
-    const tx = transactions.find(t => t.id === currentActiveTxId);
-    
-    Swal.fire({
-        title: 'Hapus Transaksi?',
-        text: "Data yang dihapus tidak dapat dikembalikan!",
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#ef4444',
-        cancelButtonColor: '#9ca3af',
-        confirmButtonText: 'Ya, Hapus!',
-        cancelButtonText: 'Batal'
-    }).then(async (result) => {
-        if (result.isConfirmed) {
-            
-            if (!sql) {
-                Swal.fire('Terhapus', 'Simulasi hapus berhasil.', 'success');
-                btnCloseModal.click();
-                return;
-            }
-
-            try {
-                // Delete doc from Neon
-                await sql`DELETE FROM transaksi WHERE id = ${tx.id}`;
-                
-                btnCloseModal.click();
-                Swal.fire('Terhapus!', 'Transaksi telah dihapus.', 'success');
-                fetchDataManual(); // Refresh manually
-            } catch (error) {
-                console.error("Error removing document: ", error);
-                Swal.fire('Error', 'Gagal menghapus transaksi', 'error');
-            }
-        }
+    const result = await Swal.fire({
+        title: 'Hapus Transaksi?', text: 'Data yang dihapus tidak dapat dikembalikan!',
+        icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#9ca3af',
+        confirmButtonText: 'Ya, Hapus!', cancelButtonText: 'Batal'
     });
+    if (!result.isConfirmed) return;
+
+    if (!sql) { Swal.fire('Terhapus', 'Simulasi berhasil', 'success'); document.getElementById('btnCloseModal').click(); return; }
+
+    try {
+        await sql`DELETE FROM transaksi WHERE id = ${currentActiveTxId}`;
+        document.getElementById('btnCloseModal').click();
+        Swal.fire('Terhapus!', 'Transaksi telah dihapus.', 'success');
+        // Refresh the correct view
+        if (activeKegiatanId) {
+            await fetchKegiatanTransactions(activeKegiatanId);
+            renderKegiatanDetail();
+        } else {
+            await fetchKasUmum();
+        }
+    } catch (err) { console.error(err); Swal.fire('Error', 'Gagal menghapus', 'error'); }
 });
 
-// --- Export to CSV ---
-const exportCSV = (period) => {
-    const filtered = filterByPeriod(transactions, period);
-    
-    if (filtered.length === 0) {
-        Swal.fire('Info', 'Tidak ada data untuk diekspor di periode ini', 'info');
-        return;
-    }
+// ===================== EXPORT PDF =====================
+const generatePDF = (title, txList, periodLabel) => {
+    if (txList.length === 0) { Swal.fire('Info', 'Tidak ada data untuk diekspor', 'info'); return; }
 
     let totalIn = 0, totalOut = 0;
-    let csvContent = "data:text/csv;charset=utf-8,";
-    csvContent += "No,Tanggal,Jenis,Kategori,Judul,Nominal,Catatan\n";
-
-    filtered.forEach((tx, i) => {
-        const jenis = tx.type === 'in' ? 'Pemasukan' : 'Pengeluaran';
-        const judul = `"${tx.judul.replace(/"/g, '""')}"`;
-        const catatan = tx.catatan ? `"${tx.catatan.replace(/"/g, '""')}"` : '""';
-        
-        if (tx.type === 'in') totalIn += Number(tx.nominal);
-        else totalOut += Number(tx.nominal);
-        
-        const row = `${i + 1},${tx.tanggal},${jenis},${tx.kategori},${judul},${tx.nominal},${catatan}`;
-        csvContent += row + "\n";
+    let rows = '';
+    txList.forEach((tx, i) => {
+        const jenis = tx.type === 'in' ? 'Masuk' : 'Keluar';
+        const color = tx.type === 'in' ? '#10b981' : '#ef4444';
+        if (tx.type === 'in') totalIn += Number(tx.nominal); else totalOut += Number(tx.nominal);
+        rows += `<tr>
+            <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:center;font-size:11px">${i + 1}</td>
+            <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;font-size:11px">${tx.tanggal}</td>
+            <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;font-size:11px"><span style="color:${color};font-weight:bold">${jenis}</span></td>
+            <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;font-size:11px">${tx.kategori}</td>
+            <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;font-size:11px">${tx.judul}</td>
+            <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:right;font-size:11px">${formatRupiah(tx.nominal)}</td>
+            <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;font-size:10px;color:#6b7280">${tx.catatan || '-'}</td>
+        </tr>`;
     });
 
-    // Append summary rows
-    csvContent += "\n";
-    csvContent += `,,,,,\n`;
-    csvContent += `,,,,Total Pemasukan,${totalIn},\n`;
-    csvContent += `,,,,Total Pengeluaran,${totalOut},\n`;
-    csvContent += `,,,,Saldo,${totalIn - totalOut},\n`;
+    const html = `
+        <div style="font-family:Arial,sans-serif;padding:20px;max-width:800px;margin:0 auto;">
+            <div style="text-align:center;margin-bottom:20px;">
+                <h1 style="font-size:18px;color:#1e3a5f;margin:0;">Laporan Keuangan</h1>
+                <h2 style="font-size:14px;color:#3b82f6;margin:4px 0;">${title}</h2>
+                <p style="font-size:11px;color:#6b7280;">Periode: ${periodLabel} | Dicetak: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:16px;gap:8px;">
+                <div style="flex:1;background:#ecfdf5;border-radius:8px;padding:10px;text-align:center;">
+                    <p style="font-size:10px;color:#6b7280;margin:0">Pemasukan</p>
+                    <p style="font-size:14px;font-weight:bold;color:#10b981;margin:4px 0 0">${formatRupiah(totalIn)}</p>
+                </div>
+                <div style="flex:1;background:#fef2f2;border-radius:8px;padding:10px;text-align:center;">
+                    <p style="font-size:10px;color:#6b7280;margin:0">Pengeluaran</p>
+                    <p style="font-size:14px;font-weight:bold;color:#ef4444;margin:4px 0 0">${formatRupiah(totalOut)}</p>
+                </div>
+                <div style="flex:1;background:#eff6ff;border-radius:8px;padding:10px;text-align:center;">
+                    <p style="font-size:10px;color:#6b7280;margin:0">Saldo</p>
+                    <p style="font-size:14px;font-weight:bold;color:#3b82f6;margin:4px 0 0">${formatRupiah(totalIn - totalOut)}</p>
+                </div>
+            </div>
+            <table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:8px;">
+                <thead>
+                    <tr style="background:#f3f4f6;">
+                        <th style="padding:8px;font-size:11px;text-align:center;border-bottom:2px solid #d1d5db">No</th>
+                        <th style="padding:8px;font-size:11px;text-align:left;border-bottom:2px solid #d1d5db">Tanggal</th>
+                        <th style="padding:8px;font-size:11px;text-align:left;border-bottom:2px solid #d1d5db">Jenis</th>
+                        <th style="padding:8px;font-size:11px;text-align:left;border-bottom:2px solid #d1d5db">Kategori</th>
+                        <th style="padding:8px;font-size:11px;text-align:left;border-bottom:2px solid #d1d5db">Judul</th>
+                        <th style="padding:8px;font-size:11px;text-align:right;border-bottom:2px solid #d1d5db">Nominal</th>
+                        <th style="padding:8px;font-size:11px;text-align:left;border-bottom:2px solid #d1d5db">Catatan</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>
+    `;
 
-    const periodLabel = { all: 'Semua', week: '1Minggu', month: '1Bulan', year: '1Tahun' }[period] || 'Semua';
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Laporan_Keuangan_${periodLabel}_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const container = document.getElementById('pdfTemplate');
+    container.innerHTML = html;
+    container.style.display = 'block';
+
+    const filename = `Laporan_${title.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+    html2pdf().set({
+        margin: 0.3,
+        filename,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' }
+    }).from(container).save().then(() => {
+        container.style.display = 'none';
+        container.innerHTML = '';
+    });
 };
 
-btnExport.addEventListener('click', () => {
-    if (transactions.length === 0) {
-        Swal.fire('Info', 'Belum ada data untuk diekspor', 'info');
-        return;
-    }
-
-    Swal.fire({
-        title: 'Ekspor Laporan CSV',
+// Export Kas Umum (from main header button)
+document.getElementById('btnExport').addEventListener('click', async () => {
+    const { value: period } = await Swal.fire({
+        title: 'Ekspor PDF - Kas Umum',
         text: 'Pilih periode data yang ingin diekspor:',
         icon: 'question',
         input: 'select',
-        inputOptions: {
-            'all': 'Semua Data',
-            'week': '1 Minggu Terakhir',
-            'month': '1 Bulan Terakhir',
-            'year': '1 Tahun Terakhir'
-        },
+        inputOptions: { 'all': 'Semua Data', 'week': '1 Minggu Terakhir', 'month': '1 Bulan Terakhir', 'year': '1 Tahun Terakhir' },
         inputValue: 'all',
         showCancelButton: true,
-        confirmButtonText: '<i class="fa-solid fa-download"></i> Ekspor',
+        confirmButtonText: '<i class="fa-solid fa-file-pdf"></i> Ekspor PDF',
         cancelButtonText: 'Batal',
         confirmButtonColor: '#3b82f6',
-        inputValidator: (value) => {
-            if (!value) return 'Pilih periode terlebih dahulu';
-        }
-    }).then((result) => {
-        if (result.isConfirmed) {
-            exportCSV(result.value);
-        }
     });
+    if (!period) return;
+    const filtered = filterByPeriod(kasTransactions, period);
+    const periodLabels = { all: 'Semua', week: '1 Minggu Terakhir', month: '1 Bulan Terakhir', year: '1 Tahun Terakhir' };
+    generatePDF('Kas Umum', filtered, periodLabels[period]);
 });
 
-// Initialize
-fetchDataManual();
+// Export Kegiatan (from detail header button)
+document.getElementById('btnExportKegiatan').addEventListener('click', () => {
+    if (!activeKegiatanData) return;
+    generatePDF(activeKegiatanData.nama, kegTransactions, 'Semua Transaksi');
+});
+
+// ===================== INIT =====================
+const init = async () => {
+    await Promise.all([fetchKasUmum(), fetchKegiatanList()]);
+};
+
+init();
