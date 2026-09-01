@@ -780,7 +780,7 @@ const checkAuthAndRoute = () => {
     document.getElementById('mainHeader')?.classList.remove('hidden');
     
     if (currentUser.role === 'super_admin') {
-        document.getElementById('headerTitle').innerHTML = 'PMII Sambas<br>Super Admin';
+        document.getElementById('headerTitle').innerHTML = 'PMII PC Sambas<br><span class="text-xs font-normal text-blue-100">Super Admin</span>';
         document.getElementById('bottomNav')?.classList.remove('hidden');
         document.getElementById('navBtnBerita')?.classList.remove('hidden');
         document.getElementById('navBtnUsers')?.classList.remove('hidden');
@@ -790,7 +790,7 @@ const checkAuthAndRoute = () => {
         fetchUsersList();
         showView('viewKasUmum');
     } else if (currentUser.role === 'bendahara') {
-        document.getElementById('headerTitle').innerHTML = 'PMII Sambas<br>Finance';
+        document.getElementById('headerTitle').innerHTML = 'PMII PC Sambas<br><span class="text-xs font-normal text-blue-100">Finance</span>';
         document.getElementById('bottomNav')?.classList.remove('hidden');
         document.getElementById('navBtnBerita')?.classList.add('hidden');
         document.getElementById('navBtnUsers')?.classList.add('hidden');
@@ -798,7 +798,7 @@ const checkAuthAndRoute = () => {
         fetchKegiatanList();
         showView('viewKasUmum');
     } else if (currentUser.role === 'narator') {
-        document.getElementById('headerTitle').innerHTML = 'PMII Sambas<br>Narator';
+        document.getElementById('headerTitle').innerHTML = 'PMII PC Sambas<br><span class="text-xs font-normal text-blue-100">Narator</span>';
         document.getElementById('bottomNav')?.classList.add('hidden');
         const greetingEl = document.getElementById('naratorGreeting');
         const badgeEl = document.getElementById('naratorUserBadge');

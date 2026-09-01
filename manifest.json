@@ -1,6 +1,6 @@
 {
-  "name": "PMII Sambas Finance",
-  "short_name": "PMII Sambas",
+  "name": "PMII PC Sambas",
+  "short_name": "PMII PC Sambas",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#ffffff",
