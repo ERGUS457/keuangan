@@ -89,7 +89,20 @@ const bottomNav = document.getElementById('bottomNav');
 
 const showView = (viewId) => {
     views.forEach(v => v.classList.remove('active'));
-    document.getElementById(viewId).classList.add('active');
+    const target = document.getElementById(viewId);
+    if (target) target.classList.add('active');
+
+    // Update bottom navigation active status
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+        if (btn.classList.contains('bg-primary') || btn.id === 'fabAdd') return;
+        if (btn.getAttribute('data-target') === viewId) {
+            btn.classList.add('text-primary');
+            btn.classList.remove('text-gray-400');
+        } else {
+            btn.classList.remove('text-primary');
+            btn.classList.add('text-gray-400');
+        }
+    });
 };
 
 const showMainLayout = () => {
