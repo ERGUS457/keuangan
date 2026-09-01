@@ -922,6 +922,12 @@ const openNewsEditor = (newsItem = null) => {
     document.getElementById('inputNewsContent').value = newsItem?.isi || '';
     document.getElementById('inputNewsStatus').value = newsItem?.status || 'PUBLISHED';
     
+    // Clear AI inputs for fresh writing
+    const pts = document.getElementById('aiInputPoints'); if (pts) pts.value = '';
+    const loc = document.getElementById('aiInputLocation'); if (loc) loc.value = '';
+    const qts = document.getElementById('aiInputQuotes'); if (qts) qts.value = '';
+    const tone = document.getElementById('aiInputTone'); if (tone) tone.value = 'formal';
+
     currentNewsImageBase64 = newsItem?.gambar_base64 || null;
     const previewContainer = document.getElementById('newsPreviewContainer');
     const imgPreview = document.getElementById('imgNewsPreview');
@@ -953,8 +959,93 @@ const closeNewsEditor = () => {
 };
 
 document.getElementById('btnOpenNewArticleModal')?.addEventListener('click', () => openNewsEditor(null));
+document.getElementById('btnBannerCreateNews')?.addEventListener('click', () => openNewsEditor(null));
 document.getElementById('btnCloseNewsEditor')?.addEventListener('click', closeNewsEditor);
 document.getElementById('btnCancelNews')?.addEventListener('click', closeNewsEditor);
+
+// ===================== AI NARRATION GENERATOR =====================
+const generateAiNarrative = async () => {
+    const title = document.getElementById('inputNewsTitle').value.trim();
+    const points = document.getElementById('aiInputPoints').value.trim();
+    const location = document.getElementById('aiInputLocation').value.trim() || 'Kabupaten Sambas';
+    const quotes = document.getElementById('aiInputQuotes').value.trim();
+    const tone = document.getElementById('aiInputTone').value;
+
+    if (!points && !title) {
+        Swal.fire('Perhatian', 'Harap isi Judul atau Inti Kegiatan terlebih dahulu agar AI dapat merangkai narasi.', 'warning');
+        return;
+    }
+
+    const btn = document.getElementById('btnGenerateAiNarrative');
+    const txt = document.getElementById('txtBtnGenerate');
+    const spinner = document.getElementById('spinnerAiGen');
+
+    btn.disabled = true;
+    txt.textContent = 'Menulis Narasi...';
+    spinner.classList.remove('hidden');
+
+    try {
+        await new Promise(r => setTimeout(r, 600));
+
+        let leadParagraph = '';
+        let bodyParagraphs = '';
+        let closingParagraph = '';
+
+        const actualTitle = title || points;
+        const mainSubject = points || title;
+        const narasumber = quotes || 'Ketua PC PMII Sambas Sahabat Ergus';
+
+        if (tone === 'formal') {
+            leadParagraph = `SAMBAS — Pengurus Cabang Pergerakan Mahasiswa Islam Indonesia (PC PMII) Kabupaten Sambas kembali menegaskan komitmennya dalam mengawal pergerakan intelektual dan pengabdian. Bertempat di ${location}, kegiatan bertajuk "${actualTitle}" telah terlaksana dengan lancar, tertib, dan khidmat.`;
+
+            bodyParagraphs = `Agenda ini mengangkat fokus penting mengenai ${mainSubject}. Hadir jajaran pengurus, kader, serta elemen organisasi yang secara aktif berdialog dan mendiskusikan langkah-langkah strategis ke depan demi menjawab tantangan kemahasiswaan dan dinamika kedaerahan di Kabupaten Sambas.\n\nDalam arahan dan sambutannya, ${narasumber} menyampaikan pesan penguatan nilai-nilai dasar pergerakan. "Kader PMII harus senantiasa memegang teguh komitmen keislaman dan keindonesiaan. Setiap langkah dan program kerja yang kita canangkan harus berorientasi pada kemaslahatan umat serta kemajuan Kabupaten Sambas," tuturnya.`;
+
+            closingParagraph = `Kegiatan tersebut ditutup dengan sesi konsolidasi dan doa bersama, memperkokoh soliditas kepengurusan PC PMII Sambas untuk terus berkhidmat di bawah panji Dzikir, Fikir, dan Amal Sholeh.\n\n(Narator / Rilis Media: PC PMII Cabang Sambas)`;
+        } else if (tone === 'inspiring') {
+            leadParagraph = `SAMBAS — Gelora semangat pergerakan kembali berkobar di Kabupaten Sambas. Bertempat di ${location}, PC PMII Kabupaten Sambas sukses menggelar agenda inspiratif: "${actualTitle}".`;
+
+            bodyParagraphs = `Kegiatan ini menyoroti ${mainSubject}. Antusiasme tinggi terpancar dari raut wajah sahabat-sahabati kader yang hadir, mencerminkan daya juang dan keteguhan idealisme mahasiswa Islam Indonesia.\n\n${narasumber} dalam orasinya memantik api perjuangan seluruh hadirin. "Kader PMII adalah pewaris masa depan peradaban. Jangan pernah lelah berproses dan belajar, karena sejarah bangsa selalu diukir oleh pemuda yang berani melangkah dan mengabdi dengan tulus," serunya membakar semangat forum.`;
+
+            closingParagraph = `Melalui momentum ini, PC PMII Sambas bertekad terus melahirkan kader-kader pelopor yang militan, progresif, dan berintegritas tinggi. Tangan Terkepal dan Maju ke Muka!\n\n(Pewarta: Biro Media & Informasi PC PMII Sambas)`;
+        } else {
+            // Critical / Opinion
+            leadParagraph = `SAMBAS — Merespons dinamika sosial dan pembangunan di Kabupaten Sambas, PC PMII Kabupaten Sambas merilis kajian dan pandangan kritis bertajuk "${actualTitle}", bertempat di ${location}.`;
+
+            bodyParagraphs = `Sorotan utama dalam agenda ini adalah ${mainSubject}. PMII Sambas menilai bahwa keberpihakan kepada masyarakat dan pengawalan kebijakan publik yang transparan merupakan keniscayaan demi mewujudkan keadilan sosial.\n\n${narasumber} menegaskan pentingnya nalar kritis di kalangan aktivis mahasiswa. "Kita tidak boleh berdiam diri melihat ketimpangan. Mahasiswa harus hadir membawa gagasan solutif dan menjadi penyambung lidah aspirasi rakyat secara konstruktif," ungkapnya.`;
+
+            closingParagraph = `PC PMII Sambas mengajak seluruh elemen kepemudaan untuk terus bersinergi dan merawat dialektika kritis demi masa depan Sambas yang lebih bermartabat.\n\nWallahul Muwaffiq ila Aqwamith Tharieq.\n(Rilis Pers: PC PMII Sambas)`;
+        }
+
+        const fullArticle = `${leadParagraph}\n\n${bodyParagraphs}\n\n${closingParagraph}`;
+
+        const contentTextarea = document.getElementById('inputNewsContent');
+        contentTextarea.value = fullArticle;
+
+        if (!title && points) {
+            document.getElementById('inputNewsTitle').value = points;
+        }
+
+        Swal.fire({
+            icon: 'success',
+            title: '✨ Narasi AI Selesai Dibuat!',
+            text: 'Paragraf jurnalistik telah otomatis tersusun. Anda dapat langsung mengedit atau menerbitkannya.',
+            timer: 2000,
+            showConfirmButton: false
+        });
+
+        contentTextarea.focus();
+        contentTextarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } catch (err) {
+        console.error('AI Gen Error:', err);
+        Swal.fire('Error', 'Gagal memproses narasi AI: ' + (err.message || ''), 'error');
+    } finally {
+        btn.disabled = false;
+        txt.textContent = 'Generate Narasi';
+        spinner.classList.add('hidden');
+    }
+};
+
+document.getElementById('btnGenerateAiNarrative')?.addEventListener('click', generateAiNarrative);
 
 // News Image Handlers
 const handleNewsImageSelect = (e) => {
