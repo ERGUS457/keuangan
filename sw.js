@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kaskegiatan-v2';
+const CACHE_NAME = 'kaskegiatan-v3';
 const urlsToCache = [
   './',
   './index.html',
@@ -41,37 +41,29 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
-  // Only cache GET requests
   if (event.request.method !== 'GET') return;
   
-  // Don't cache API requests or external CDNs aggressively if they fail
+  // Network First Strategy
   event.respondWith(
-    caches.match(event.request)
+    fetch(event.request)
       .then(response => {
-        if (response) {
+        // Check if we received a valid response
+        if(!response || response.status !== 200 || response.type !== 'basic') {
           return response;
         }
-        return fetch(event.request).then(
-          function(response) {
-            // Check if we received a valid response
-            if(!response || response.status !== 200 || response.type !== 'basic') {
-              return response;
-            }
-
-            // Clone the response
-            var responseToCache = response.clone();
-
-            caches.open(CACHE_NAME)
-              .then(function(cache) {
-                // Don't cache everything indiscriminately, but cache our assets
-                if (event.request.url.startsWith(self.location.origin)) {
-                    cache.put(event.request, responseToCache);
-                }
-              });
-
-            return response;
+        
+        // Cache the fresh response
+        const responseToCache = response.clone();
+        caches.open(CACHE_NAME).then(cache => {
+          if (event.request.url.startsWith(self.location.origin)) {
+            cache.put(event.request, responseToCache);
           }
-        );
+        });
+        return response;
+      })
+      .catch(() => {
+        // If network fails, try to serve from cache
+        return caches.match(event.request);
       })
   );
 });
