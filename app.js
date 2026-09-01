@@ -809,28 +809,44 @@ const checkAuthAndRoute = () => {
     }
 };
 
-// Secret Login Trigger: Klik logo/nama navbar 3 kali cepat untuk membuka Login (100% senyap tanpa animasi)
+// Secret Kamuflase Trigger:
+// Klik 1x -> Refresh / scroll ke paling atas beranda publik (seperti link web normal)
+// Klik 3x cepat -> Membuka form login internal
 let logoClickCount = 0;
 let logoClickTimer = null;
+let singleClickActionTimer = null;
 
-const triggerSecretLogin = () => {
+const handleBrandLogoClick = () => {
     logoClickCount++;
-    clearTimeout(logoClickTimer);
 
-    if (logoClickCount >= 3) {
+    if (logoClickCount === 1) {
+        // Timer untuk klik 1x (jika tidak ada klik lanjutan)
+        singleClickActionTimer = setTimeout(() => {
+            logoClickCount = 0;
+            window.scrollTo(0, 0);
+            const container = document.getElementById('mainContainer');
+            if (container) {
+                container.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+            fetchBerita();
+        }, 380);
+    } else if (logoClickCount >= 3) {
+        // Triple click cepat! Batalkan aksi 1x dan buka halaman login
+        clearTimeout(singleClickActionTimer);
+        clearTimeout(logoClickTimer);
         logoClickCount = 0;
         document.getElementById('landingHeader')?.classList.add('hidden');
         showView('viewLogin');
         return;
     }
 
+    clearTimeout(logoClickTimer);
     logoClickTimer = setTimeout(() => {
         logoClickCount = 0;
-    }, 1000);
+    }, 800);
 };
 
-document.getElementById('landingSecretLogoTrigger')?.addEventListener('click', triggerSecretLogin);
-document.getElementById('landingHeaderLogo')?.addEventListener('click', triggerSecretLogin);
+document.getElementById('landingSecretLogoTrigger')?.addEventListener('click', handleBrandLogoClick);
 
 // Smooth internal scroll for Landing Navbar
 window.scrollToLandingSection = (sectionId) => {
