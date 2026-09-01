@@ -826,7 +826,7 @@ const angkaTerbilang = (n) => {
     return n.toString();
 };
 
-const generateKuitansiPDF = (tx) => {
+const generateKuitansiPDF = async (tx) => {
     if (!tx || tx.type !== 'in') {
         Swal.fire('Info', 'Kuitansi hanya dapat dicetak untuk transaksi pemasukan/iuran.', 'info');
         return;
@@ -836,36 +836,30 @@ const generateKuitansiPDF = (tx) => {
     const tahun = new Date(tx.tanggal || Date.now()).getFullYear();
     const terbilangText = angkaTerbilang(tx.nominal) + ' Rupiah';
 
-    const container = document.createElement('div');
-    container.style.position = 'fixed';
-    container.style.left = '-9999px';
-    container.style.top = '0';
-    container.style.width = '680px';
-    container.style.background = '#ffffff';
-    container.style.padding = '0';
-    container.style.boxSizing = 'border-box';
+    const container = document.getElementById('kuitansiTemplate');
+    if (!container) return;
 
     container.innerHTML = `
-        <div style="font-family: Arial, Helvetica, sans-serif; padding: 25px 30px; color: #1e293b; background: #ffffff; border: 2px solid #2563eb; border-radius: 12px; position: relative; box-sizing: border-box;">
+        <div id="kuitansiPrintArea" style="font-family: Arial, Helvetica, sans-serif; width: 760px; padding: 24px 28px; color: #1e293b; background: #ffffff; border: 2.5px solid #1d4ed8; border-radius: 12px; position: relative; box-sizing: border-box; margin: 0 auto;">
             <!-- Watermark Logo -->
-            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.08; pointer-events: none;">
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.08; pointer-events: none; text-align: center;">
                 <img src="./logo.jpg" style="width: 220px; height: 220px; object-fit: contain;">
             </div>
 
             <!-- Kop Surat Kuitansi -->
-            <div style="display: flex; align-items: center; border-bottom: 2px solid #1d4ed8; padding-bottom: 12px; margin-bottom: 15px;">
-                <img src="./logo.jpg" style="width: 52px; height: 52px; object-fit: contain; margin-right: 15px; border-radius: 50%;">
+            <div style="display: flex; align-items: center; border-bottom: 2px solid #1d4ed8; padding-bottom: 12px; margin-bottom: 14px;">
+                <img src="./logo.jpg" style="width: 55px; height: 55px; object-fit: contain; margin-right: 14px; border-radius: 50%;">
                 <div style="flex: 1; text-align: center;">
-                    <h2 style="margin: 0; font-size: 13px; font-weight: 900; color: #1e3a8a; text-transform: uppercase; letter-spacing: 0.5px;">PENGURUS CABANG PERGERAKAN MAHASISWA ISLAM INDONESIA</h2>
-                    <h3 style="margin: 3px 0 0 0; font-size: 12px; font-weight: 800; color: #1d4ed8;">(PC PMII) KABUPATEN SAMBAS</h3>
-                    <p style="margin: 2px 0 0 0; font-size: 8.5px; color: #64748b;">Sekretariat: Jl. Raya Sejangkung, Desa Sebayan, Kec. Sambas &bull; WA: 0831-4006-3145</p>
+                    <h2 style="margin: 0; font-size: 13px; font-weight: 900; color: #1e3a8a; text-transform: uppercase; letter-spacing: 0.5px; line-height: 1.3;">PENGURUS CABANG PERGERAKAN MAHASISWA ISLAM INDONESIA</h2>
+                    <h3 style="margin: 3px 0 0 0; font-size: 12px; font-weight: 800; color: #1d4ed8; letter-spacing: 0.5px;">(PC PMII) KABUPATEN SAMBAS</h3>
+                    <p style="margin: 3px 0 0 0; font-size: 8.5px; color: #64748b;">Sekretariat: Jl. Raya Sejangkung, Desa Sebayan, Kec. Sambas &bull; WA: 0831-4006-3145</p>
                 </div>
             </div>
 
             <!-- Header Title & Nomor -->
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
-                <span style="background: #1d4ed8; color: #ffffff; padding: 4px 12px; border-radius: 6px; font-weight: 800; font-size: 10.5px; letter-spacing: 1px;">KUITANSI TANDA TERIMA</span>
-                <span style="font-size: 10px; font-weight: bold; color: #475569;">No: KWT/PC-PMII-SBS/${tahun}/${shortId}</span>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <span style="background: #1d4ed8; color: #ffffff; padding: 4px 12px; border-radius: 6px; font-weight: 800; font-size: 10px; letter-spacing: 1px;">KUITANSI TANDA TERIMA</span>
+                <span style="font-size: 9.5px; font-weight: bold; color: #475569;">No: KWT/PC-PMII-SBS/${tahun}/${shortId}</span>
             </div>
 
             <!-- Detail Data Kuitansi -->
@@ -873,29 +867,29 @@ const generateKuitansiPDF = (tx) => {
                 <tr>
                     <td style="width: 130px; padding: 6px 0; color: #475569; font-weight: bold;">Telah Diterima Dari</td>
                     <td style="width: 12px; padding: 6px 0;">:</td>
-                    <td style="padding: 6px 0; font-weight: bold; color: #0f172a; border-bottom: 1px dotted #cbd5e1;">${tx.judul}</td>
+                    <td style="padding: 6px 0; font-weight: bold; color: #0f172a; border-bottom: 1px dotted #94a3b8;">${tx.judul}</td>
                 </tr>
                 <tr>
                     <td style="padding: 6px 0; color: #475569; font-weight: bold;">Uang Sejumlah</td>
                     <td style="padding: 6px 0;">:</td>
-                    <td style="padding: 6px 0; font-weight: bold; color: #1e3a8a; font-style: italic; border-bottom: 1px dotted #cbd5e1; background: #f8fafc;">
+                    <td style="padding: 6px 0; font-weight: bold; color: #1e3a8a; font-style: italic; border-bottom: 1px dotted #94a3b8; background: #f8fafc;">
                         "${terbilangText}"
                     </td>
                 </tr>
                 <tr>
                     <td style="padding: 6px 0; color: #475569; font-weight: bold;">Untuk Pembayaran</td>
                     <td style="padding: 6px 0;">:</td>
-                    <td style="padding: 6px 0; color: #334155; border-bottom: 1px dotted #cbd5e1;">${tx.catatan || tx.kategori || 'Penerimaan Kas PMII'}</td>
+                    <td style="padding: 6px 0; color: #334155; border-bottom: 1px dotted #94a3b8;">${tx.catatan || tx.kategori || 'Penerimaan Kas PMII'}</td>
                 </tr>
                 <tr>
                     <td style="padding: 6px 0; color: #475569; font-weight: bold;">Kategori Transaksi</td>
                     <td style="padding: 6px 0;">:</td>
-                    <td style="padding: 6px 0; color: #334155; border-bottom: 1px dotted #cbd5e1;">${tx.kategori}${tx.nama_kegiatan ? ` (Kegiatan: ${tx.nama_kegiatan})` : ''}</td>
+                    <td style="padding: 6px 0; color: #334155; border-bottom: 1px dotted #94a3b8;">${tx.kategori}${tx.nama_kegiatan ? ` (Kegiatan: ${tx.nama_kegiatan})` : ''}</td>
                 </tr>
             </table>
 
             <!-- Nominal & Tanda Tangan -->
-            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 14px;">
                 <div style="border: 2px solid #16a34a; background: #f0fdf4; padding: 8px 16px; border-radius: 8px; display: inline-block;">
                     <div style="font-size: 8.5px; color: #15803d; font-weight: bold; text-transform: uppercase;">Jumlah Nominal</div>
                     <div style="font-size: 15px; font-weight: 800; color: #15803d;">${formatRupiah(tx.nominal)}</div>
@@ -912,7 +906,15 @@ const generateKuitansiPDF = (tx) => {
         </div>
     `;
 
-    document.body.appendChild(container);
+    // Make visible in fixed position behind modal
+    container.classList.remove('hidden');
+    container.style.display = 'block';
+    container.style.position = 'fixed';
+    container.style.top = '0';
+    container.style.left = '0';
+    container.style.width = '780px';
+    container.style.zIndex = '50';
+    container.style.background = '#ffffff';
 
     Swal.fire({
         title: 'Mempersiapkan Kuitansi...',
@@ -921,16 +923,28 @@ const generateKuitansiPDF = (tx) => {
         didOpen: () => { Swal.showLoading(); }
     });
 
+    const targetEl = document.getElementById('kuitansiPrintArea') || container;
+
+    // Small delay to ensure browser paints fonts and DOM elements
+    await new Promise(r => setTimeout(r, 250));
+
     const opt = {
-        margin: [5, 5, 5, 5],
-        filename: `Kuitansi-PMII-${tx.judul.replace(/[^a-zA-Z0-9]/g, '_')}-${shortId}.pdf`,
+        margin: [4, 4, 4, 4],
+        filename: `Kuitansi-PMII-${(tx.judul || 'Iuran').replace(/[^a-zA-Z0-9]/g, '_')}-${shortId}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, logging: false },
+        html2canvas: { 
+            scale: 2, 
+            useCORS: true, 
+            logging: false,
+            windowWidth: 800,
+            scrollX: 0,
+            scrollY: 0
+        },
         jsPDF: { unit: 'mm', format: 'a5', orientation: 'landscape' }
     };
 
-    html2pdf().set(opt).from(container).save().then(() => {
-        if (container.parentNode) document.body.removeChild(container);
+    try {
+        await html2pdf().set(opt).from(targetEl).save();
         Swal.close();
         Swal.fire({
             icon: 'success',
@@ -939,16 +953,25 @@ const generateKuitansiPDF = (tx) => {
             timer: 2000,
             showConfirmButton: false
         });
-    }).catch(err => {
-        if (container.parentNode) document.body.removeChild(container);
+    } catch (err) {
         console.error('Kuitansi error:', err);
         Swal.fire('Error', 'Gagal membuat kuitansi PDF: ' + err.message, 'error');
-    });
+    } finally {
+        container.style.display = 'none';
+        container.classList.add('hidden');
+        container.innerHTML = '';
+    }
 };
 
 document.getElementById('btnCetakKuitansi')?.addEventListener('click', () => {
-    if (currentActiveTxObj) {
-        generateKuitansiPDF(currentActiveTxObj);
+    let tx = currentActiveTxObj;
+    if (!tx && currentActiveTxId) {
+        tx = kasTransactions.find(t => t.id === currentActiveTxId) || kegTransactions.find(t => t.id === currentActiveTxId);
+    }
+    if (tx) {
+        generateKuitansiPDF(tx);
+    } else {
+        Swal.fire('Info', 'Data transaksi tidak ditemukan.', 'warning');
     }
 });
 
