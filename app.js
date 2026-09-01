@@ -478,32 +478,77 @@ btnDeleteTx.addEventListener('click', async () => {
 });
 
 // --- Export to CSV ---
+const exportCSV = (period) => {
+    const filtered = filterByPeriod(transactions, period);
+    
+    if (filtered.length === 0) {
+        Swal.fire('Info', 'Tidak ada data untuk diekspor di periode ini', 'info');
+        return;
+    }
+
+    let totalIn = 0, totalOut = 0;
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += "No,Tanggal,Jenis,Kategori,Judul,Nominal,Catatan\n";
+
+    filtered.forEach((tx, i) => {
+        const jenis = tx.type === 'in' ? 'Pemasukan' : 'Pengeluaran';
+        const judul = `"${tx.judul.replace(/"/g, '""')}"`;
+        const catatan = tx.catatan ? `"${tx.catatan.replace(/"/g, '""')}"` : '""';
+        
+        if (tx.type === 'in') totalIn += Number(tx.nominal);
+        else totalOut += Number(tx.nominal);
+        
+        const row = `${i + 1},${tx.tanggal},${jenis},${tx.kategori},${judul},${tx.nominal},${catatan}`;
+        csvContent += row + "\n";
+    });
+
+    // Append summary rows
+    csvContent += "\n";
+    csvContent += `,,,,,\n`;
+    csvContent += `,,,,Total Pemasukan,${totalIn},\n`;
+    csvContent += `,,,,Total Pengeluaran,${totalOut},\n`;
+    csvContent += `,,,,Saldo,${totalIn - totalOut},\n`;
+
+    const periodLabel = { all: 'Semua', week: '1Minggu', month: '1Bulan', year: '1Tahun' }[period] || 'Semua';
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `Laporan_Keuangan_${periodLabel}_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+};
+
 btnExport.addEventListener('click', () => {
     if (transactions.length === 0) {
         Swal.fire('Info', 'Belum ada data untuk diekspor', 'info');
         return;
     }
 
-    let csvContent = "data:text/csv;charset=utf-8,";
-    csvContent += "Tanggal,Jenis,Kategori,Judul,Nominal,Catatan\n";
-
-    transactions.forEach(tx => {
-        const jenis = tx.type === 'in' ? 'Pemasukan' : 'Pengeluaran';
-        // escape quotes in notes/judul
-        const judul = `"${tx.judul.replace(/"/g, '""')}"`;
-        const catatan = tx.catatan ? `"${tx.catatan.replace(/"/g, '""')}"` : '""';
-        
-        const row = `${tx.tanggal},${jenis},${tx.kategori},${judul},${tx.nominal},${catatan}`;
-        csvContent += row + "\n";
+    Swal.fire({
+        title: 'Ekspor Laporan CSV',
+        text: 'Pilih periode data yang ingin diekspor:',
+        icon: 'question',
+        input: 'select',
+        inputOptions: {
+            'all': 'Semua Data',
+            'week': '1 Minggu Terakhir',
+            'month': '1 Bulan Terakhir',
+            'year': '1 Tahun Terakhir'
+        },
+        inputValue: 'all',
+        showCancelButton: true,
+        confirmButtonText: '<i class="fa-solid fa-download"></i> Ekspor',
+        cancelButtonText: 'Batal',
+        confirmButtonColor: '#3b82f6',
+        inputValidator: (value) => {
+            if (!value) return 'Pilih periode terlebih dahulu';
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            exportCSV(result.value);
+        }
     });
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Laporan_Keuangan_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link); // Required for FF
-    link.click();
-    document.body.removeChild(link);
 });
 
 // Initialize
