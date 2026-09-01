@@ -800,6 +800,24 @@ const triggerSecretLogin = () => {
 document.getElementById('landingSecretLogoTrigger')?.addEventListener('click', triggerSecretLogin);
 document.getElementById('landingHeaderLogo')?.addEventListener('click', triggerSecretLogin);
 
+// Smooth internal scroll for Landing Navbar
+window.scrollToLandingSection = (sectionId) => {
+    const container = document.getElementById('mainContainer');
+    const target = document.getElementById(sectionId);
+    if (!container || !target) return;
+
+    // Keep window offset locked to 0
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+
+    const targetTop = target.offsetTop - 12;
+    container.scrollTo({
+        top: Math.max(0, targetTop),
+        behavior: 'smooth'
+    });
+};
+
 document.getElementById('btnBackToLanding')?.addEventListener('click', () => {
     checkAuthAndRoute();
 });
