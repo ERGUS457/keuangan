@@ -161,7 +161,7 @@ const openFormForKegiatan = (kegId, kegNama) => {
     showView('viewForm');
 };
 
-document.getElementById('btnBackFromForm').addEventListener('click', () => {
+document.getElementById('btnBackFromForm')?.addEventListener('click', () => {
     if (inputKegiatanId.value) {
         // Go back to detail kegiatan
         openDetailKegiatan(inputKegiatanId.value);
@@ -195,13 +195,13 @@ const handleImageSelect = (e) => {
     };
 };
 
-document.getElementById('inputFileGallery').addEventListener('change', handleImageSelect);
-document.getElementById('inputFileCamera').addEventListener('change', handleImageSelect);
-btnRemoveImage.addEventListener('click', () => {
+document.getElementById('inputFileGallery')?.addEventListener('change', handleImageSelect);
+document.getElementById('inputFileCamera')?.addEventListener('change', handleImageSelect);
+btnRemoveImage?.addEventListener('click', () => {
     currentImageBase64 = null; imgPreview.src = '';
     previewContainer.classList.add('hidden');
-    document.getElementById('inputFileGallery').value = '';
-    document.getElementById('inputFileCamera').value = '';
+    const f1 = document.getElementById('inputFileGallery'); if (f1) f1.value = '';
+    const f2 = document.getElementById('inputFileCamera'); if (f2) f2.value = '';
 });
 
 // ===================== SUBMIT TRANSACTION =====================
@@ -675,22 +675,22 @@ const checkAuthAndRoute = () => {
     }
 };
 
-document.getElementById('btnGoToLogin').addEventListener('click', () => {
-    document.getElementById('landingHeader').classList.add('hidden');
+document.getElementById('btnGoToLogin')?.addEventListener('click', () => {
+    document.getElementById('landingHeader')?.classList.add('hidden');
     showView('viewLogin');
 });
 
-document.getElementById('btnBackToLanding').addEventListener('click', () => {
+document.getElementById('btnBackToLanding')?.addEventListener('click', () => {
     checkAuthAndRoute();
 });
 
-document.getElementById('btnLogout').addEventListener('click', () => {
+document.getElementById('btnLogout')?.addEventListener('click', () => {
     localStorage.removeItem('pmii_user');
     currentUser = null;
     checkAuthAndRoute();
 });
 
-document.getElementById('loginForm').addEventListener('submit', async (e) => {
+document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const u = document.getElementById('loginUsername').value.trim();
     const p = document.getElementById('loginPassword').value.trim();
