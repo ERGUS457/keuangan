@@ -1489,8 +1489,8 @@ const renderUsersList = () => {
             </div>
 
             <div class="flex items-center justify-end gap-2 border-t border-gray-50 pt-2.5">
-                <button onclick="window.changeUserPassword('${u.id}', '${u.username}')" class="text-xs px-3 py-1.5 rounded-lg bg-yellow-50 text-yellow-700 font-bold hover:bg-yellow-100 transition flex items-center gap-1.5">
-                    <i class="fa-solid fa-key"></i> Ubah Sandi
+                <button onclick="window.editUserItem('${u.id}')" class="text-xs px-3 py-1.5 rounded-lg bg-yellow-50 text-yellow-700 font-bold hover:bg-yellow-100 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-user-pen"></i> Edit Akun
                 </button>
                 ${!isCurrent ? `
                     <button onclick="window.deleteUserItem('${u.id}', '${u.username}')" class="text-xs px-3 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 transition flex items-center gap-1.5">
@@ -1504,13 +1504,38 @@ const renderUsersList = () => {
 };
 
 const userFormModal = document.getElementById('userFormModal');
+
 const openAddUserModal = () => {
     document.getElementById('inputUserId').value = '';
     document.getElementById('inputUserUsername').value = '';
     document.getElementById('inputUserPassword').value = '';
     document.getElementById('inputUserRole').value = 'bendahara';
+    
     document.getElementById('userFormModalTitle').textContent = 'Tambah Akun Pengguna';
-    document.getElementById('inputUserUsername').disabled = false;
+    const pwdLabel = document.getElementById('labelUserPassword');
+    if (pwdLabel) pwdLabel.textContent = 'Password';
+    document.getElementById('inputUserPassword').placeholder = 'Masukkan password baru';
+    document.getElementById('btnSaveUserText').textContent = 'Simpan Akun';
+
+    userFormModal?.classList.remove('hidden');
+    userFormModal?.classList.add('flex');
+};
+
+window.editUserItem = (userId) => {
+    const user = usersList.find(u => u.id === userId);
+    if (!user) return;
+
+    document.getElementById('inputUserId').value = user.id;
+    document.getElementById('inputUserUsername').value = user.username;
+    document.getElementById('inputUserPassword').value = '';
+    document.getElementById('inputUserRole').value = user.role;
+    
+    document.getElementById('userFormModalTitle').textContent = `Edit Akun: ${user.username}`;
+    const pwdLabel = document.getElementById('labelUserPassword');
+    if (pwdLabel) pwdLabel.textContent = 'Password (Kosongkan jika tidak diubah)';
+    document.getElementById('inputUserPassword').placeholder = 'Biarkan kosong jika tidak diubah';
+    document.getElementById('btnSaveUserText').textContent = 'Perbarui Akun';
+
     userFormModal?.classList.remove('hidden');
     userFormModal?.classList.add('flex');
 };
@@ -1532,8 +1557,13 @@ document.getElementById('userForm')?.addEventListener('submit', async (e) => {
     const password = document.getElementById('inputUserPassword').value.trim();
     const role = document.getElementById('inputUserRole').value;
 
-    if (!username || !password) {
-        Swal.fire('Perhatian', 'Username dan password wajib diisi', 'warning');
+    if (!username) {
+        Swal.fire('Perhatian', 'Username wajib diisi', 'warning');
+        return;
+    }
+
+    if (!id && !password) {
+        Swal.fire('Perhatian', 'Password wajib diisi untuk akun baru', 'warning');
         return;
     }
 
@@ -1547,12 +1577,34 @@ document.getElementById('userForm')?.addEventListener('submit', async (e) => {
         spinner.classList.remove('hidden');
 
         if (id) {
-            // Update password & role
-            await sql`
-                UPDATE users
-                SET password = ${password}, role = ${role}
-                WHERE id = ${id}
-            `;
+            // Check if new username is already taken by another account
+            const duplicate = await sql`SELECT id FROM users WHERE username = ${username} AND id != ${id}`;
+            if (duplicate.length > 0) {
+                Swal.fire('Error', `Username "${username}" sudah digunakan oleh akun lain!`, 'error');
+                return;
+            }
+
+            if (password) {
+                await sql`
+                    UPDATE users
+                    SET username = ${username}, password = ${password}, role = ${role}
+                    WHERE id = ${id}
+                `;
+            } else {
+                await sql`
+                    UPDATE users
+                    SET username = ${username}, role = ${role}
+                    WHERE id = ${id}
+                `;
+            }
+
+            // If user edited their own active account, update local storage session
+            if (currentUser?.id === id) {
+                currentUser.username = username;
+                currentUser.role = role;
+                localStorage.setItem('pmii_user', JSON.stringify(currentUser));
+            }
+
             Swal.fire({ icon: 'success', title: 'Berhasil', text: `Akun ${username} berhasil diperbarui!`, timer: 1500, showConfirmButton: false });
         } else {
             // Check existing
@@ -1576,37 +1628,10 @@ document.getElementById('userForm')?.addEventListener('submit', async (e) => {
         Swal.fire('Error', 'Gagal menyimpan akun: ' + (err.message || ''), 'error');
     } finally {
         btn.disabled = false;
-        btnTxt.textContent = 'Simpan Akun';
+        btnTxt.textContent = id ? 'Perbarui Akun' : 'Simpan Akun';
         spinner.classList.add('hidden');
     }
 });
-
-window.changeUserPassword = async (userId, username) => {
-    const { value: newPassword } = await Swal.fire({
-        title: `Ubah Password: ${username}`,
-        input: 'password',
-        inputLabel: 'Masukkan Password Baru',
-        inputPlaceholder: 'Password baru',
-        showCancelButton: true,
-        confirmButtonText: 'Simpan',
-        cancelButtonText: 'Batal',
-        confirmButtonColor: '#3b82f6',
-        inputValidator: (value) => {
-            if (!value || value.length < 4) {
-                return 'Password minimal 4 karakter!';
-            }
-        }
-    });
-
-    if (newPassword) {
-        try {
-            await sql`UPDATE users SET password = ${newPassword} WHERE id = ${userId}`;
-            Swal.fire({ icon: 'success', title: 'Berhasil', text: `Password akun ${username} berhasil diubah!`, timer: 1500, showConfirmButton: false });
-        } catch (e) {
-            Swal.fire('Error', 'Gagal mengubah password: ' + (e.message || ''), 'error');
-        }
-    }
-};
 
 window.deleteUserItem = async (userId, username) => {
     const result = await Swal.fire({
