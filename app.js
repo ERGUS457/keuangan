@@ -376,6 +376,8 @@ const fetchKegiatanTransactions = async (kegId) => {
     } catch (err) { console.error(err); }
 };
 
+const fetchKegiatan = fetchKegiatanList;
+
 // ===================== RENDER KAS UMUM =====================
 const renderKasUmum = () => {
     const filtered = filterByPeriod(kasTransactions, kasPeriod);
@@ -770,7 +772,7 @@ const checkAuthAndRoute = () => {
         document.getElementById('navBtnBerita')?.classList.remove('hidden');
         document.getElementById('navBtnUsers')?.classList.remove('hidden');
         fetchKasUmum();
-        fetchKegiatan();
+        fetchKegiatanList();
         fetchBerita();
         fetchUsersList();
         showView('viewKasUmum');
@@ -780,7 +782,7 @@ const checkAuthAndRoute = () => {
         document.getElementById('navBtnBerita')?.classList.add('hidden');
         document.getElementById('navBtnUsers')?.classList.add('hidden');
         fetchKasUmum();
-        fetchKegiatan();
+        fetchKegiatanList();
         showView('viewKasUmum');
     } else if (currentUser.role === 'narator') {
         document.getElementById('headerTitle').innerHTML = 'PMII Sambas<br>Narator';
