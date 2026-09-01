@@ -153,6 +153,7 @@ const openFormForKasUmum = () => {
     if (titleEl) titleEl.textContent = 'Catat Kas Umum';
     showMainLayout();
     showView('viewForm');
+    document.getElementById('mainContainer')?.scrollTo({ top: 0, behavior: 'instant' });
 };
 
 // Open form for Kegiatan
@@ -163,6 +164,7 @@ const openFormForKegiatan = (kegId, kegNama) => {
     if (titleEl) titleEl.textContent = `Catat: ${kegNama}`;
     showDetailLayout();
     showView('viewForm');
+    document.getElementById('mainContainer')?.scrollTo({ top: 0, behavior: 'instant' });
 };
 
 document.getElementById('fabAdd')?.addEventListener('click', (e) => {
