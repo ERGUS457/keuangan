@@ -777,18 +777,12 @@ const checkAuthAndRoute = () => {
     }
 };
 
-// Secret Login Trigger: Klik logo navbar 3 kali untuk membuka Login
+// Secret Login Trigger: Klik logo/nama navbar 3 kali cepat untuk membuka Login (100% senyap tanpa animasi)
 let logoClickCount = 0;
 let logoClickTimer = null;
 
 const triggerSecretLogin = () => {
     logoClickCount++;
-    const logoImg = document.getElementById('landingHeaderLogo');
-    if (logoImg) {
-        logoImg.classList.add('scale-125', 'rotate-12');
-        setTimeout(() => logoImg.classList.remove('scale-125', 'rotate-12'), 250);
-    }
-
     clearTimeout(logoClickTimer);
 
     if (logoClickCount >= 3) {
@@ -800,7 +794,7 @@ const triggerSecretLogin = () => {
 
     logoClickTimer = setTimeout(() => {
         logoClickCount = 0;
-    }, 1200);
+    }, 1000);
 };
 
 document.getElementById('landingSecretLogoTrigger')?.addEventListener('click', triggerSecretLogin);
