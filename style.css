@@ -5,7 +5,6 @@ html, body {
     overflow: hidden;
     margin: 0;
     padding: 0;
-    overscroll-behavior-y: none;
 }
 
 body {
@@ -13,9 +12,10 @@ body {
 }
 
 #mainContainer {
+    overflow-y: auto !important;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-y: contain;
-    touch-action: pan-y;
+    touch-action: pan-y !important;
 }
 
 .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -27,9 +27,15 @@ body {
 .view-section {
     display: none;
     animation: fadeIn 0.25s ease-in-out;
+    touch-action: pan-y;
 }
 .view-section.active {
     display: block;
+}
+
+canvas#financeChart {
+    pointer-events: none !important;
+    touch-action: pan-y !important;
 }
 
 @keyframes fadeIn {
