@@ -320,7 +320,6 @@ const renderKegiatanList = () => {
     kegiatanList.forEach(keg => {
         const card = document.createElement('div');
         card.className = "bg-white rounded-xl p-4 shadow-sm border border-gray-100 active:bg-gray-50 transition cursor-pointer";
-        const dateRange = keg.tanggal_mulai ? `${formatDate(keg.tanggal_mulai)}${keg.tanggal_selesai ? ' - ' + formatDate(keg.tanggal_selesai) : ''}` : 'Tanggal belum diatur';
         card.innerHTML = `
             <div class="flex justify-between items-start">
                 <div class="flex items-start space-x-3">
@@ -329,7 +328,6 @@ const renderKegiatanList = () => {
                     </div>
                     <div>
                         <h3 class="font-bold text-gray-800">${keg.nama}</h3>
-                        <p class="text-[11px] text-gray-500 mt-0.5"><i class="fa-regular fa-calendar mr-1"></i>${dateRange}</p>
                         ${keg.deskripsi ? `<p class="text-xs text-gray-400 mt-1 line-clamp-1">${keg.deskripsi}</p>` : ''}
                     </div>
                 </div>
@@ -348,8 +346,7 @@ const openDetailKegiatan = async (kegId) => {
     if (!activeKegiatanData) { await fetchKegiatanList(); activeKegiatanData = kegiatanList.find(k => k.id === kegId); }
 
     document.getElementById('detailHeaderTitle').textContent = activeKegiatanData?.nama || 'Kegiatan';
-    const dateRange = activeKegiatanData?.tanggal_mulai ? `${formatDate(activeKegiatanData.tanggal_mulai)}${activeKegiatanData.tanggal_selesai ? ' - ' + formatDate(activeKegiatanData.tanggal_selesai) : ''}` : '';
-    document.getElementById('detailHeaderDate').textContent = dateRange;
+    document.getElementById('detailHeaderDate').textContent = '';
 
     const descContainer = document.getElementById('kegDeskripsiContainer');
     if (activeKegiatanData?.deskripsi) {
@@ -397,10 +394,6 @@ document.getElementById('btnBuatKegiatan').addEventListener('click', async () =>
         html: `
             <input id="swalNama" class="swal2-input" placeholder="Nama Kegiatan" style="font-size:14px">
             <input id="swalDesc" class="swal2-input" placeholder="Deskripsi (opsional)" style="font-size:14px">
-            <div style="display:flex;gap:8px;padding:0 1.6em;">
-                <input id="swalStart" type="date" class="swal2-input" style="font-size:13px;margin:0.5em 0;flex:1" placeholder="Mulai">
-                <input id="swalEnd" type="date" class="swal2-input" style="font-size:13px;margin:0.5em 0;flex:1" placeholder="Selesai">
-            </div>
         `,
         focusConfirm: false,
         showCancelButton: true,
@@ -413,8 +406,8 @@ document.getElementById('btnBuatKegiatan').addEventListener('click', async () =>
             return {
                 nama,
                 deskripsi: document.getElementById('swalDesc').value,
-                tanggal_mulai: document.getElementById('swalStart').value || null,
-                tanggal_selesai: document.getElementById('swalEnd').value || null
+                tanggal_mulai: null,
+                tanggal_selesai: null
             };
         }
     });
