@@ -690,6 +690,21 @@ document.getElementById('btnLogout')?.addEventListener('click', () => {
     checkAuthAndRoute();
 });
 
+document.getElementById('btnTogglePassword')?.addEventListener('click', () => {
+    const pwd = document.getElementById('loginPassword');
+    const icon = document.getElementById('iconTogglePassword');
+    if (!pwd || !icon) return;
+    if (pwd.type === 'password') {
+        pwd.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    } else {
+        pwd.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+    }
+});
+
 document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const u = document.getElementById('loginUsername').value.trim();

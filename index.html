@@ -156,7 +156,12 @@
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-gray-600 mb-1">Password</label>
-                            <input type="password" id="loginPassword" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Masukkan password" required autocomplete="current-password">
+                            <div class="relative">
+                                <input type="password" id="loginPassword" class="w-full pl-4 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Masukkan password" required autocomplete="current-password">
+                                <button type="button" id="btnTogglePassword" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none p-1" title="Lihat password">
+                                    <i class="fa-solid fa-eye" id="iconTogglePassword"></i>
+                                </button>
+                            </div>
                         </div>
                         <button type="submit" id="btnLoginSubmit" class="w-full bg-primary text-white font-bold py-3 rounded-lg hover:bg-blue-600 transition mt-2 shadow-sm">Masuk</button>
                         <button type="button" id="btnBackToLanding" class="w-full text-sm text-gray-500 hover:text-primary transition mt-2 py-1">Kembali ke Beranda</button>
