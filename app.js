@@ -263,7 +263,8 @@ const fetchKasUmum = async () => {
         renderKasUmum(); return;
     }
     try {
-        kasTransactions = await sql`SELECT * FROM transaksi WHERE kegiatan_id IS NULL ORDER BY tanggal DESC, created_at DESC` || [];
+        // Fetch all transactions so Kas Umum accumulates everything (both general and per-kegiatan)
+        kasTransactions = await sql`SELECT t.*, k.nama as nama_kegiatan FROM transaksi t LEFT JOIN kegiatan k ON t.kegiatan_id = k.id ORDER BY t.tanggal DESC, t.created_at DESC` || [];
         renderKasUmum();
     } catch (err) { console.error(err); }
 };
@@ -462,7 +463,7 @@ const createTxElement = (tx) => {
             </div>
             <div class="truncate pr-2">
                 <p class="font-bold text-sm text-gray-800 truncate">${tx.judul}</p>
-                <p class="text-[10px] text-gray-500">${formatDate(tx.tanggal)} &bull; ${tx.kategori}</p>
+                <p class="text-[10px] text-gray-500">${formatDate(tx.tanggal)} &bull; ${tx.kategori}${tx.nama_kegiatan ? ` &bull; <span class="text-indigo-500 font-semibold">${tx.nama_kegiatan}</span>` : ''}</p>
             </div>
         </div>
         <div class="text-right shrink-0">
@@ -484,7 +485,7 @@ const openDetailModal = (tx) => {
     document.getElementById('modalBadge').textContent = isMasuk ? 'Pemasukan' : 'Pengeluaran';
     document.getElementById('modalBadge').className = `text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide ${isMasuk ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`;
     document.getElementById('modalJudul').textContent = tx.judul;
-    document.getElementById('modalKategori').innerHTML = `<i class="fa-solid fa-tag"></i> ${tx.kategori}`;
+    document.getElementById('modalKategori').innerHTML = `<i class="fa-solid fa-tag"></i> ${tx.kategori}${tx.nama_kegiatan ? ` &bull; <span class="text-indigo-500">${tx.nama_kegiatan}</span>` : ''}`;
     document.getElementById('modalTanggal').textContent = formatDate(tx.tanggal);
     document.getElementById('modalNominal').textContent = formatRupiah(tx.nominal);
     document.getElementById('modalNominal').className = `text-xl font-extrabold ${isMasuk ? 'text-green-600' : 'text-red-600'}`;
@@ -562,7 +563,7 @@ const generatePDF = (title, txList, periodLabel) => {
             <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;font-size:11px">${tx.tanggal}</td>
             <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;font-size:11px"><span style="color:${color};font-weight:bold">${jenis}</span></td>
             <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;font-size:11px">${tx.kategori}</td>
-            <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;font-size:11px">${tx.judul}</td>
+            <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;font-size:11px">${tx.judul}${tx.nama_kegiatan ? `<br><span style="color:#6366f1;font-size:9px">[Keg: ${tx.nama_kegiatan}]</span>` : ''}</td>
             <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:right;font-size:11px">${formatRupiah(tx.nominal)}</td>
             <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;font-size:10px;color:#6b7280">${tx.catatan || '-'}</td>
         </tr>`;
