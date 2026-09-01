@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kaskegiatan-v8';
+const CACHE_NAME = 'kaskegiatan-v9';
 const urlsToCache = [
   './',
   './index.html',

@@ -147,19 +147,28 @@ inputTanggal.valueAsDate = new Date();
 
 // Open form for Kas Umum
 const openFormForKasUmum = () => {
+    resetForm();
     inputKegiatanId.value = '';
-    document.getElementById('formTitle').textContent = 'Catat Kas Umum';
+    const titleEl = document.getElementById('formTitle');
+    if (titleEl) titleEl.textContent = 'Catat Kas Umum';
     showMainLayout();
     showView('viewForm');
 };
 
 // Open form for Kegiatan
 const openFormForKegiatan = (kegId, kegNama) => {
+    resetForm();
     inputKegiatanId.value = kegId;
-    document.getElementById('formTitle').textContent = `Catat: ${kegNama}`;
+    const titleEl = document.getElementById('formTitle');
+    if (titleEl) titleEl.textContent = `Catat: ${kegNama}`;
     showDetailLayout();
     showView('viewForm');
 };
+
+document.getElementById('fabAdd')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    openFormForKasUmum();
+});
 
 document.getElementById('btnBackFromForm')?.addEventListener('click', () => {
     if (inputKegiatanId.value) {
@@ -379,19 +388,19 @@ const renderKegiatanDetail = () => {
     kegTransactions.forEach(tx => list.appendChild(createTxElement(tx)));
 };
 
-document.getElementById('btnAddTxKegiatan').addEventListener('click', () => {
+document.getElementById('btnAddTxKegiatan')?.addEventListener('click', () => {
     if (!activeKegiatanId || !activeKegiatanData) return;
     openFormForKegiatan(activeKegiatanId, activeKegiatanData.nama);
 });
 
-document.getElementById('btnBackFromDetail').addEventListener('click', () => {
+document.getElementById('btnBackFromDetail')?.addEventListener('click', () => {
     activeKegiatanId = null; activeKegiatanData = null;
     showMainLayout();
     showView('viewKegiatan');
 });
 
 // ===================== BUAT KEGIATAN =====================
-document.getElementById('btnBuatKegiatan').addEventListener('click', async () => {
+document.getElementById('btnBuatKegiatan')?.addEventListener('click', async () => {
     const { value: formValues } = await Swal.fire({
         title: 'Buat Kegiatan Baru',
         html: `
@@ -430,7 +439,7 @@ document.getElementById('btnBuatKegiatan').addEventListener('click', async () =>
 });
 
 // ===================== HAPUS KEGIATAN =====================
-document.getElementById('btnDeleteKegiatan').addEventListener('click', async () => {
+document.getElementById('btnDeleteKegiatan')?.addEventListener('click', async () => {
     if (!activeKegiatanId) return;
     const result = await Swal.fire({
         title: 'Hapus Kegiatan?',
