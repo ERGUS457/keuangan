@@ -55,7 +55,9 @@ const formatDate = (dateString) => {
 // --- Navigation ---
 navBtns.forEach(btn => {
     btn.addEventListener('click', (e) => {
-        const targetId = btn.currentTarget.getAttribute('data-target');
+        const navBtn = e.currentTarget;
+        const targetId = navBtn.getAttribute('data-target');
+        if (!targetId) return;
         
         // Update view
         views.forEach(v => v.classList.remove('active'));
@@ -68,9 +70,9 @@ navBtns.forEach(btn => {
             n.classList.add('text-gray-400');
         });
         
-        if (!btn.currentTarget.classList.contains('bg-primary')) {
-            btn.currentTarget.classList.add('text-primary');
-            btn.currentTarget.classList.remove('text-gray-400');
+        if (!navBtn.classList.contains('bg-primary')) {
+            navBtn.classList.add('text-primary');
+            navBtn.classList.remove('text-gray-400');
         }
     });
 });
