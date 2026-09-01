@@ -7,9 +7,9 @@
   "theme_color": "#3b82f6",
   "icons": [
     {
-      "src": "logo.jpg",
+      "src": "logo-pmii.png",
       "sizes": "256x256",
-      "type": "image/jpeg",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ]

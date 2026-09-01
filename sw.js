@@ -1,10 +1,11 @@
-const CACHE_NAME = 'kaskegiatan-v24';
+const CACHE_NAME = 'kaskegiatan-v25';
 const urlsToCache = [
   './',
   './index.html',
   './style.css',
   './app.js',
   './neon-config.js',
+  './logo-pmii.png',
   './logo.jpg',
   './manifest.json',
   'https://cdn.tailwindcss.com',
