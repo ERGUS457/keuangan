@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kaskegiatan-v26';
+const CACHE_NAME = 'kaskegiatan-v27';
 const urlsToCache = [
   './',
   './index.html',
@@ -11,6 +11,7 @@ const urlsToCache = [
   'https://cdn.tailwindcss.com',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
   'https://cdn.jsdelivr.net/npm/sweetalert2@11',
+  'https://cdn.jsdelivr.net/npm/chart.js',
   'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'
 ];
 

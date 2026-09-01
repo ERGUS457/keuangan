@@ -39,3 +39,56 @@ body {
 
 #txModal { display: none; }
 #txModal.active { display: flex; }
+
+/* Dark Mode Theme Support */
+html.dark {
+    color-scheme: dark;
+}
+html.dark body {
+    background-color: #0b1329 !important;
+    color: #f1f5f9 !important;
+}
+html.dark #landingHeader,
+html.dark #mainContainer {
+    background-color: #0b1329 !important;
+    border-color: #1e293b !important;
+}
+html.dark .bg-white {
+    background-color: #151f38 !important;
+    color: #f1f5f9 !important;
+}
+html.dark .bg-gray-50 {
+    background-color: #0b1329 !important;
+}
+html.dark .bg-gray-100 {
+    background-color: #1e293b !important;
+    color: #cbd5e1 !important;
+}
+html.dark .text-gray-800,
+html.dark .text-gray-900,
+html.dark .text-gray-700 {
+    color: #f8fafc !important;
+}
+html.dark .text-gray-600,
+html.dark .text-gray-500 {
+    color: #94a3b8 !important;
+}
+html.dark .border-gray-100,
+html.dark .border-gray-200 {
+    border-color: #24304f !important;
+}
+html.dark #bottomNav {
+    background-color: #151f38 !important;
+    border-color: #24304f !important;
+}
+html.dark input,
+html.dark select,
+html.dark textarea {
+    background-color: #151f38 !important;
+    color: #f8fafc !important;
+    border-color: #334155 !important;
+}
+html.dark .border-t,
+html.dark .border-b {
+    border-color: #24304f !important;
+}

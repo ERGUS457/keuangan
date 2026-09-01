@@ -8,12 +8,17 @@ let kegTransactions = [];    // transaksi kegiatan aktif
 let beritaList = [];         // daftar berita
 let beritaFilter = 'all';    // filter status berita
 let usersList = [];          // daftar akun pengguna (super admin)
+let aspirasiList = [];       // daftar aspirasi kader
 let currentImagesBase64 = [];       // array of images for transaction
 let currentNewsImagesBase64 = [];   // array of images for news
 let activeKegiatanId = null; // kegiatan yang sedang dibuka
 let activeKegiatanData = null;
 let currentActiveTxId = null;
+let currentActiveTxObj = null;
+let currentReadingNews = null;
 let kasPeriod = 'all';
+let financeChartInstance = null;
+let currentChartMode = 'kategori'; // 'kategori' | 'tren'
 
 // Helper for multi-image parsing
 const parseImages = (imgData) => {
@@ -71,14 +76,33 @@ const filterByPeriod = (list, period) => {
     return list.filter(tx => { const d = new Date(tx.tanggal); return d >= cutoff && d <= now; });
 };
 
-const activateFilterBtn = (container, activeBtn) => {
-    container.querySelectorAll('button').forEach(b => {
-        b.classList.remove('bg-primary', 'text-white', 'shadow-sm', 'active-filter');
-        b.classList.add('bg-gray-100', 'text-gray-500');
-    });
-    activeBtn.classList.remove('bg-gray-100', 'text-gray-500');
-    activeBtn.classList.add('bg-primary', 'text-white', 'shadow-sm', 'active-filter');
+// ===================== DARK MODE =====================
+const initDarkMode = () => {
+    const isDark = localStorage.getItem('pmii_dark_mode') === 'true';
+    if (isDark) {
+        document.documentElement.classList.add('dark');
+        updateDarkIcons(true);
+    } else {
+        document.documentElement.classList.remove('dark');
+        updateDarkIcons(false);
+    }
 };
+
+const toggleDarkMode = () => {
+    const isDark = document.documentElement.classList.toggle('dark');
+    localStorage.setItem('pmii_dark_mode', isDark ? 'true' : 'false');
+    updateDarkIcons(isDark);
+};
+
+const updateDarkIcons = (isDark) => {
+    const iconLanding = document.querySelector('#btnToggleDarkLanding i');
+    const iconMain = document.querySelector('#btnToggleDarkMain i');
+    if (iconLanding) iconLanding.className = isDark ? 'fa-solid fa-sun text-xs text-yellow-400' : 'fa-solid fa-moon text-xs';
+    if (iconMain) iconMain.className = isDark ? 'fa-solid fa-sun text-xs text-yellow-300' : 'fa-solid fa-moon text-xs';
+};
+
+document.getElementById('btnToggleDarkLanding')?.addEventListener('click', toggleDarkMode);
+document.getElementById('btnToggleDarkMain')?.addEventListener('click', toggleDarkMode);
 
 // ===================== NAVIGATION =====================
 const views = document.querySelectorAll('.view-section');
@@ -391,6 +415,157 @@ const fetchKegiatanTransactions = async (kegId) => {
 
 const fetchKegiatan = fetchKegiatanList;
 
+// ===================== FINANCE CHART (CHART.JS) =====================
+const renderFinanceChart = () => {
+    const canvas = document.getElementById('financeChart');
+    if (!canvas || typeof Chart === 'undefined') return;
+
+    const filtered = filterByPeriod(kasTransactions, kasPeriod);
+
+    if (financeChartInstance) {
+        financeChartInstance.destroy();
+        financeChartInstance = null;
+    }
+
+    const ctx = canvas.getContext('2d');
+    const isDark = document.documentElement.classList.contains('dark');
+
+    if (currentChartMode === 'kategori') {
+        // Group expenses by category
+        const catMap = {};
+        filtered.forEach(tx => {
+            if (tx.type === 'out') {
+                const cat = tx.kategori || 'Lainnya';
+                catMap[cat] = (catMap[cat] || 0) + Number(tx.nominal);
+            }
+        });
+
+        const labels = Object.keys(catMap);
+        const data = Object.values(catMap);
+
+        if (labels.length === 0) {
+            const totalIn = filtered.reduce((acc, t) => t.type === 'in' ? acc + Number(t.nominal) : acc, 0);
+            if (totalIn > 0) {
+                labels.push('Pemasukan Masuk');
+                data.push(totalIn);
+            } else {
+                labels.push('Belum Ada Data');
+                data.push(1);
+            }
+        }
+
+        financeChartInstance = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: [
+                        '#3b82f6', '#10b981', '#f59e0b', '#ef4444',
+                        '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'
+                    ],
+                    borderWidth: 2,
+                    borderColor: isDark ? '#151f38' : '#ffffff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            boxWidth: 10,
+                            font: { size: 10 },
+                            color: isDark ? '#cbd5e1' : '#475569'
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const val = context.raw || 0;
+                                return ' Rp ' + Number(val).toLocaleString('id-ID');
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    } else {
+        // Tren Masuk vs Keluar
+        let totalIn = 0, totalOut = 0;
+        filtered.forEach(tx => {
+            if (tx.type === 'in') totalIn += Number(tx.nominal);
+            else totalOut += Number(tx.nominal);
+        });
+
+        financeChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Pemasukan', 'Pengeluaran'],
+                datasets: [{
+                    label: 'Nominal (Rp)',
+                    data: [totalIn, totalOut],
+                    backgroundColor: ['#10b981', '#ef4444'],
+                    borderRadius: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return 'Rp ' + Number(context.raw).toLocaleString('id-ID');
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            font: { size: 9 },
+                            color: isDark ? '#94a3b8' : '#64748b',
+                            callback: (v) => 'Rp ' + (v >= 1000000 ? (v/1000000).toFixed(1) + 'M' : (v/1000).toFixed(0) + 'K')
+                        },
+                        grid: {
+                            color: isDark ? '#1e293b' : '#f1f5f9'
+                        }
+                    },
+                    x: {
+                        ticks: {
+                            font: { size: 11, weight: 'bold' },
+                            color: isDark ? '#cbd5e1' : '#475569'
+                        },
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+    }
+};
+
+document.getElementById('btnChartKategori')?.addEventListener('click', () => {
+    currentChartMode = 'kategori';
+    document.getElementById('btnChartKategori')?.classList.add('bg-white', 'text-primary', 'shadow-xs');
+    document.getElementById('btnChartKategori')?.classList.remove('text-gray-500');
+    document.getElementById('btnChartTren')?.classList.remove('bg-white', 'text-primary', 'shadow-xs');
+    document.getElementById('btnChartTren')?.classList.add('text-gray-500');
+    renderFinanceChart();
+});
+
+document.getElementById('btnChartTren')?.addEventListener('click', () => {
+    currentChartMode = 'tren';
+    document.getElementById('btnChartTren')?.classList.add('bg-white', 'text-primary', 'shadow-xs');
+    document.getElementById('btnChartTren')?.classList.remove('text-gray-500');
+    document.getElementById('btnChartKategori')?.classList.remove('bg-white', 'text-primary', 'shadow-xs');
+    document.getElementById('btnChartKategori')?.classList.add('text-gray-500');
+    renderFinanceChart();
+});
+
 // ===================== RENDER KAS UMUM =====================
 const renderKasUmum = () => {
     const filtered = filterByPeriod(kasTransactions, kasPeriod);
@@ -400,6 +575,8 @@ const renderKasUmum = () => {
     document.getElementById('txtKasSaldo').textContent = formatRupiah(totalIn - totalOut);
     document.getElementById('txtKasMasuk').textContent = formatRupiah(totalIn);
     document.getElementById('txtKasKeluar').textContent = formatRupiah(totalOut);
+
+    renderFinanceChart();
 
     const list = document.getElementById('kasUmumTxList');
     list.innerHTML = '';
@@ -578,7 +755,15 @@ const modalImageContainer = document.getElementById('modalImageContainer');
 
 const openDetailModal = (tx) => {
     currentActiveTxId = tx.id;
+    currentActiveTxObj = tx;
     const isMasuk = tx.type === 'in';
+
+    const btnKuitansi = document.getElementById('btnCetakKuitansi');
+    if (btnKuitansi) {
+        if (isMasuk) btnKuitansi.classList.remove('hidden');
+        else btnKuitansi.classList.add('hidden');
+    }
+
     document.getElementById('modalBadge').textContent = isMasuk ? 'Pemasukan' : 'Pengeluaran';
     document.getElementById('modalBadge').className = `text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide ${isMasuk ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`;
     document.getElementById('modalJudul').textContent = tx.judul;
@@ -624,6 +809,138 @@ const openDetailModal = (tx) => {
     txModal.classList.add('active');
     setTimeout(() => { txModalContent.classList.remove('scale-95', 'opacity-0'); txModalContent.classList.add('scale-100', 'opacity-100'); }, 10);
 };
+
+// ===================== KUITANSI GENERATOR =====================
+const angkaTerbilang = (n) => {
+    n = Math.abs(Math.floor(n));
+    const satuan = ['', 'Satu', 'Dua', 'Tiga', 'Empat', 'Lima', 'Enam', 'Tujuh', 'Delapan', 'Sembilan', 'Sepuluh', 'Sebelas'];
+    if (n < 12) return satuan[n];
+    if (n < 20) return angkaTerbilang(n - 10) + ' Belas';
+    if (n < 100) return (angkaTerbilang(Math.floor(n / 10)) + ' Puluh ' + satuan[n % 10]).trim();
+    if (n < 200) return ('Seratus ' + angkaTerbilang(n - 100)).trim();
+    if (n < 1000) return (angkaTerbilang(Math.floor(n / 100)) + ' Ratus ' + angkaTerbilang(n % 100)).trim();
+    if (n < 2000) return ('Seribu ' + angkaTerbilang(n - 1000)).trim();
+    if (n < 1000000) return (angkaTerbilang(Math.floor(n / 1000)) + ' Ribu ' + angkaTerbilang(n % 1000)).trim();
+    if (n < 1000000000) return (angkaTerbilang(Math.floor(n / 1000000)) + ' Juta ' + angkaTerbilang(n % 1000000)).trim();
+    if (n < 1000000000000) return (angkaTerbilang(Math.floor(n / 1000000000)) + ' Miliar ' + angkaTerbilang(n % 1000000000)).trim();
+    return n.toString();
+};
+
+const generateKuitansiPDF = (tx) => {
+    if (!tx || tx.type !== 'in') {
+        Swal.fire('Info', 'Kuitansi hanya dapat dicetak untuk transaksi pemasukan/iuran.', 'info');
+        return;
+    }
+
+    const tpl = document.getElementById('kuitansiTemplate');
+    if (!tpl) return;
+
+    const shortId = (tx.id || '').substring(0, 8).toUpperCase() || '001';
+    const tahun = new Date(tx.tanggal || Date.now()).getFullYear();
+    const terbilangText = angkaTerbilang(tx.nominal) + ' Rupiah';
+
+    tpl.innerHTML = `
+        <div style="font-family: Arial, sans-serif; padding: 25px; color: #1e293b; background: #ffffff; border: 2px solid #2563eb; border-radius: 12px; max-width: 600px; margin: 0 auto; position: relative;">
+            <!-- Watermark Logo -->
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.07; pointer-events: none;">
+                <img src="./logo.jpg" style="width: 250px; height: 250px; object-fit: contain;">
+            </div>
+
+            <!-- Kop Surat Kuitansi -->
+            <div style="display: flex; align-items: center; border-bottom: 2px solid #1d4ed8; padding-bottom: 12px; margin-bottom: 15px;">
+                <img src="./logo.jpg" style="width: 55px; height: 55px; object-fit: contain; margin-right: 15px; border-radius: 50%;">
+                <div style="flex: 1; text-align: center;">
+                    <h2 style="margin: 0; font-size: 14px; font-weight: 900; color: #1e3a8a; text-transform: uppercase; letter-spacing: 0.5px;">PENGURUS CABANG PERGERAKAN MAHASISWA ISLAM INDONESIA</h2>
+                    <h3 style="margin: 3px 0 0 0; font-size: 13px; font-weight: 800; color: #1d4ed8;">(PC PMII) KABUPATEN SAMBAS</h3>
+                    <p style="margin: 2px 0 0 0; font-size: 9px; color: #64748b;">Sekretariat: Jl. Raya Sejangkung, Desa Sebayan, Kec. Sambas &bull; WA: 0831-4006-3145</p>
+                </div>
+            </div>
+
+            <!-- Header Title & Nomor -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <span style="background: #1d4ed8; color: #ffffff; padding: 4px 12px; border-radius: 6px; font-weight: 800; font-size: 11px; letter-spacing: 1px;">KUITANSI TANDA TERIMA</span>
+                <span style="font-size: 10px; font-weight: bold; color: #475569;">No: KWT/PC-PMII-SBS/${tahun}/${shortId}</span>
+            </div>
+
+            <!-- Detail Data Kuitansi -->
+            <table style="width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 15px;">
+                <tr>
+                    <td style="width: 130px; padding: 6px 0; color: #475569; font-weight: bold;">Telah Diterima Dari</td>
+                    <td style="width: 12px;">:</td>
+                    <td style="padding: 6px 0; font-weight: bold; color: #0f172a; border-bottom: 1px dotted #94a3b8;">${tx.judul}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 6px 0; color: #475569; font-weight: bold;">Uang Sejumlah</td>
+                    <td>:</td>
+                    <td style="padding: 6px 0; font-weight: bold; color: #1e3a8a; font-style: italic; border-bottom: 1px dotted #94a3b8; background: #f8fafc;">
+                        "${terbilangText}"
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 6px 0; color: #475569; font-weight: bold;">Untuk Pembayaran</td>
+                    <td>:</td>
+                    <td style="padding: 6px 0; color: #334155; border-bottom: 1px dotted #94a3b8;">${tx.catatan || tx.kategori || 'Penerimaan Kas PMII'}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 6px 0; color: #475569; font-weight: bold;">Kategori Transaksi</td>
+                    <td>:</td>
+                    <td style="padding: 6px 0; color: #334155; border-bottom: 1px dotted #94a3b8;">${tx.kategori}${tx.nama_kegiatan ? ` (Kegiatan: ${tx.nama_kegiatan})` : ''}</td>
+                </tr>
+            </table>
+
+            <!-- Nominal & Tanda Tangan -->
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 20px;">
+                <div style="border: 2px solid #16a34a; background: #f0fdf4; padding: 8px 16px; border-radius: 8px; display: inline-block;">
+                    <div style="font-size: 9px; color: #15803d; font-weight: bold; text-transform: uppercase;">Jumlah Nominal</div>
+                    <div style="font-size: 16px; font-weight: 800; color: #15803d;">${formatRupiah(tx.nominal)}</div>
+                </div>
+
+                <div style="text-align: center; width: 170px;">
+                    <p style="margin: 0; font-size: 10px; color: #475569;">Sambas, ${formatDate(tx.tanggal)}</p>
+                    <p style="margin: 2px 0 0 0; font-size: 10px; font-weight: bold; color: #0f172a;">Bendahara Umum / Penerima,</p>
+                    <div style="height: 45px;"></div>
+                    <p style="margin: 0; font-size: 11px; font-weight: 800; color: #0f172a; text-decoration: underline;">GYARWIN SYARIF WIJAYA</p>
+                    <p style="margin: 0; font-size: 9px; color: #64748b;">PC PMII Kab. Sambas</p>
+                </div>
+            </div>
+        </div>
+    `;
+
+    Swal.fire({
+        title: 'Mempersiapkan Kuitansi...',
+        text: 'Sedang membuat PDF kuitansi resmi...',
+        allowOutsideClick: false,
+        didOpen: () => { Swal.showLoading(); }
+    });
+
+    const opt = {
+        margin: [8, 8, 8, 8],
+        filename: `Kuitansi-PMII-${tx.judul.replace(/[^a-zA-Z0-9]/g, '_')}-${shortId}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a5', orientation: 'landscape' }
+    };
+
+    html2pdf().set(opt).from(tpl).save().then(() => {
+        Swal.close();
+        Swal.fire({
+            icon: 'success',
+            title: 'Kuitansi Berhasil Dicetak!',
+            text: 'File PDF kuitansi tanda terima sah telah diunduh.',
+            timer: 2000,
+            showConfirmButton: false
+        });
+    }).catch(err => {
+        console.error('Kuitansi error:', err);
+        Swal.fire('Error', 'Gagal membuat kuitansi PDF: ' + err.message, 'error');
+    });
+};
+
+document.getElementById('btnCetakKuitansi')?.addEventListener('click', () => {
+    if (currentActiveTxObj) {
+        generateKuitansiPDF(currentActiveTxObj);
+    }
+});
 
 document.getElementById('btnCloseModal').addEventListener('click', () => {
     txModalContent.classList.remove('scale-100', 'opacity-100');
@@ -788,6 +1105,7 @@ const checkAuthAndRoute = () => {
         fetchKegiatanList();
         fetchBerita();
         fetchUsersList();
+        fetchAspirasiList();
         showView('viewKasUmum');
     } else if (currentUser.role === 'bendahara') {
         document.getElementById('headerTitle').innerHTML = 'PMII PC Sambas<br><span class="text-xs font-normal text-blue-100">Finance</span>';
@@ -1328,6 +1646,7 @@ document.getElementById('newsForm')?.addEventListener('submit', async (e) => {
 window.viewNewsDetail = (newsId) => {
     const news = beritaList.find(b => b.id === newsId);
     if (!news) return;
+    currentReadingNews = news;
 
     document.getElementById('readerNewsTitle').textContent = news.judul;
     document.getElementById('readerNewsAuthor').textContent = `Oleh ${news.author || 'Narator PMII'}`;
@@ -1382,6 +1701,35 @@ window.viewNewsDetail = (newsId) => {
     newsReaderModal?.classList.remove('hidden');
     newsReaderModal?.classList.add('flex');
 };
+
+const shareNewsToWA = () => {
+    if (!currentReadingNews) return;
+    const title = currentReadingNews.judul;
+    const snippet = currentReadingNews.isi.substring(0, 180).trim() + '...';
+    const text = `*📰 ${title}*\n\n${snippet}\n\n_Diterbitkan oleh Media & Informasi PC PMII Sambas_\nKunjungi Portal Resmi: https://ergus457.github.io/keuangan/`;
+    const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank');
+};
+
+const copyNewsRelease = async () => {
+    if (!currentReadingNews) return;
+    const text = `📰 *${currentReadingNews.judul}*\n\nOleh: ${currentReadingNews.author || 'PC PMII Sambas'} | ${formatDate(currentReadingNews.published_at || currentReadingNews.created_at)}\n\n${currentReadingNews.isi}\n\n---\n*PENGURUS CABANG PERGERAKAN MAHASISWA ISLAM INDONESIA (PMII) KABUPATEN SAMBAS*\nPortal: https://ergus457.github.io/keuangan/`;
+    try {
+        await navigator.clipboard.writeText(text);
+        Swal.fire({
+            icon: 'success',
+            title: 'Tersalin!',
+            text: 'Teks rilis berita resmi telah disalin ke clipboard.',
+            timer: 1500,
+            showConfirmButton: false
+        });
+    } catch (e) {
+        Swal.fire('Info', 'Gagal menyalin otomatis, silakan salin manual.', 'info');
+    }
+};
+
+document.getElementById('btnShareNewsWA')?.addEventListener('click', shareNewsToWA);
+document.getElementById('btnCopyNewsLink')?.addEventListener('click', copyNewsRelease);
 
 document.getElementById('btnCloseNewsReader')?.addEventListener('click', () => {
     newsReaderModal?.classList.add('hidden');
@@ -1673,6 +2021,116 @@ window.deleteUserItem = async (userId, username) => {
     }
 };
 
+// ===================== KOTAK ASPIRASI LOGIC =====================
+document.getElementById('formAspirasi')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const nama = document.getElementById('aspirasiNama').value.trim();
+    const asal = document.getElementById('aspirasiAsal').value.trim();
+    const pesan = document.getElementById('aspirasiPesan').value.trim();
+
+    if (!nama || !pesan) {
+        Swal.fire('Perhatian', 'Nama dan pesan aspirasi wajib diisi.', 'warning');
+        return;
+    }
+
+    const btn = document.getElementById('btnKirimAspirasi');
+    const txt = document.getElementById('txtBtnAspirasi');
+    try {
+        btn.disabled = true;
+        txt.textContent = 'Mengirimkan...';
+
+        if (sql) {
+            await sql`
+                INSERT INTO aspirasi (nama, asal, pesan)
+                VALUES (${nama}, ${asal}, ${pesan})
+            `;
+        }
+
+        document.getElementById('formAspirasi').reset();
+
+        Swal.fire({
+            icon: 'success',
+            title: 'Aspirasi Terkirim!',
+            text: 'Terima kasih! Pesan dan aspirasi sahabat telah diterima oleh Pengurus Cabang PMII Sambas.',
+            confirmButtonColor: '#3b82f6'
+        });
+    } catch (err) {
+        console.error('Error submitting aspirasi:', err);
+        Swal.fire('Error', 'Gagal mengirim aspirasi: ' + (err.message || ''), 'error');
+    } finally {
+        btn.disabled = false;
+        txt.textContent = 'Kirim Aspirasi';
+    }
+});
+
+const fetchAspirasiList = async () => {
+    if (!sql) return;
+    try {
+        aspirasiList = await sql`SELECT * FROM aspirasi ORDER BY created_at DESC` || [];
+        renderAspirasiList();
+    } catch (err) {
+        console.error('Error fetching aspirasi:', err);
+    }
+};
+
+const renderAspirasiList = () => {
+    const container = document.getElementById('aspirasiListContainer');
+    const countEl = document.getElementById('txtTotalAspirasiCount');
+    if (!container) return;
+
+    if (countEl) countEl.textContent = `${aspirasiList.length} Pesan Masuk`;
+    container.innerHTML = '';
+
+    if (aspirasiList.length === 0) {
+        container.innerHTML = '<div class="text-center text-gray-400 py-6 italic text-sm">Belum ada aspirasi yang masuk.</div>';
+        return;
+    }
+
+    aspirasiList.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-2 transition hover:shadow-md';
+        card.innerHTML = `
+            <div class="flex justify-between items-start">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h4 class="font-extrabold text-gray-800 text-sm">${item.nama}</h4>
+                        ${item.asal ? `<span class="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-bold border border-blue-100">${item.asal}</span>` : ''}
+                    </div>
+                    <p class="text-[10px] text-gray-400 mt-0.5"><i class="fa-regular fa-clock mr-1"></i>${formatDate(item.created_at)}</p>
+                </div>
+                <button onclick="window.deleteAspirasiItem('${item.id}')" class="text-gray-400 hover:text-red-500 p-1 transition" title="Hapus Aspirasi">
+                    <i class="fa-solid fa-trash-can text-xs"></i>
+                </button>
+            </div>
+            <p class="text-xs text-gray-700 bg-gray-50 p-2.5 rounded-xl whitespace-pre-line leading-relaxed border border-gray-100">${item.pesan}</p>
+        `;
+        container.appendChild(card);
+    });
+};
+
+window.deleteAspirasiItem = async (aspirasiId) => {
+    const res = await Swal.fire({
+        title: 'Hapus Aspirasi?',
+        text: 'Pesan aspirasi ini akan dihapus permanen!',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#9ca3af',
+        confirmButtonText: 'Ya, Hapus!',
+        cancelButtonText: 'Batal'
+    });
+
+    if (!res.isConfirmed) return;
+
+    try {
+        await sql`DELETE FROM aspirasi WHERE id = ${aspirasiId}`;
+        Swal.fire({ icon: 'success', title: 'Terhapus', text: 'Pesan aspirasi telah dihapus!', timer: 1200, showConfirmButton: false });
+        await fetchAspirasiList();
+    } catch (e) {
+        Swal.fire('Error', 'Gagal menghapus aspirasi: ' + e.message, 'error');
+    }
+};
+
 // ===================== INIT =====================
 const initDB = async () => {
     if (!sql) return;
@@ -1685,9 +2143,13 @@ const initDB = async () => {
     try {
         await sql`CREATE TABLE IF NOT EXISTS berita (id UUID DEFAULT gen_random_uuid() PRIMARY KEY, judul VARCHAR(255) NOT NULL, isi TEXT NOT NULL, gambar_base64 TEXT, status VARCHAR(20) DEFAULT 'DRAFT', author VARCHAR(50), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, published_at TIMESTAMP)`;
     } catch(e) {}
+    try {
+        await sql`CREATE TABLE IF NOT EXISTS aspirasi (id UUID DEFAULT gen_random_uuid() PRIMARY KEY, nama VARCHAR(100) NOT NULL, asal VARCHAR(100), pesan TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`;
+    } catch(e) {}
 };
 
 const init = async () => {
+    initDarkMode();
     await initDB();
     await Promise.all([fetchKasUmum(), fetchKegiatanList(), fetchBerita()]);
     checkAuthAndRoute();

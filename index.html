@@ -10,6 +10,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
+            darkMode: 'class',
             theme: {
                 extend: {
                     colors: {
@@ -23,6 +24,8 @@
     </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- Chart.js for analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- html2pdf.js for PDF export -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <link rel="stylesheet" href="style.css">
@@ -30,7 +33,7 @@
 <body class="bg-gray-50 text-gray-800 font-sans antialiased min-h-screen flex flex-col overflow-hidden relative">
 
     <!-- Public Landing Header -->
-    <header id="landingHeader" class="bg-white shadow-sm z-30 sticky top-0 border-b border-gray-100">
+    <header id="landingHeader" class="bg-white shadow-sm z-30 sticky top-0 border-b border-gray-100 transition-colors">
         <div class="px-4 py-2.5 flex justify-between items-center">
             <!-- Discrete Secret Trigger: Click Logo/Brand 3 times to open Login -->
             <div class="flex items-center space-x-2.5 select-none cursor-pointer" id="landingSecretLogoTrigger">
@@ -40,12 +43,18 @@
                     <p class="text-[10px] font-extrabold text-primary leading-none">Masa Khidmat 2026-2027</p>
                 </div>
             </div>
-            <!-- Quick Navigation Navbar -->
-            <nav class="flex items-center gap-1 text-xs font-bold">
-                <button type="button" onclick="window.scrollToLandingSection('sectionStruktur')" class="px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-primary hover:bg-blue-50 transition">Struktur</button>
-                <button type="button" onclick="window.scrollToLandingSection('sectionBerita')" class="px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-primary hover:bg-blue-50 transition">Berita</button>
-                <button type="button" onclick="window.scrollToLandingSection('sectionKontak')" class="px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-primary hover:bg-blue-50 transition">Kontak</button>
-            </nav>
+            <!-- Dark Mode Toggle & Quick Navigation Navbar -->
+            <div class="flex items-center gap-1">
+                <button type="button" id="btnToggleDarkLanding" class="w-8 h-8 rounded-full bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-yellow-400 flex items-center justify-center hover:bg-gray-200 transition" title="Mode Gelap/Terang">
+                    <i class="fa-solid fa-moon text-xs"></i>
+                </button>
+                <nav class="flex items-center gap-0.5 text-xs font-bold">
+                    <button type="button" onclick="window.scrollToLandingSection('sectionStruktur')" class="px-2 py-1.5 rounded-lg text-gray-600 hover:text-primary hover:bg-blue-50 transition">Struktur</button>
+                    <button type="button" onclick="window.scrollToLandingSection('sectionBerita')" class="px-2 py-1.5 rounded-lg text-gray-600 hover:text-primary hover:bg-blue-50 transition">Berita</button>
+                    <button type="button" onclick="window.scrollToLandingSection('sectionAspirasi')" class="px-2 py-1.5 rounded-lg text-gray-600 hover:text-primary hover:bg-blue-50 transition">Aspirasi</button>
+                    <button type="button" onclick="window.scrollToLandingSection('sectionKontak')" class="px-2 py-1.5 rounded-lg text-gray-600 hover:text-primary hover:bg-blue-50 transition">Kontak</button>
+                </nav>
+            </div>
         </div>
     </header>
 
@@ -55,15 +64,18 @@
             <img src="./logo.jpg" alt="Logo PC PMII Sambas" class="w-8 h-8 object-contain rounded-full bg-white p-0.5">
             <h1 class="text-lg font-bold tracking-wide leading-tight" id="headerTitle">PMII PC<br>Sambas</h1>
         </div>
-        <div class="flex space-x-2">
-            <button id="btnInstall" class="hidden bg-white text-primary p-2 rounded-full shadow hover:bg-gray-100 transition w-9 h-9 flex items-center justify-center" title="Install App">
-                <i class="fa-solid fa-download"></i>
+        <div class="flex space-x-2 items-center">
+            <button id="btnToggleDarkMain" class="bg-white/20 text-white p-2 rounded-full hover:bg-white/30 transition w-8 h-8 flex items-center justify-center" title="Mode Gelap/Terang">
+                <i class="fa-solid fa-moon text-xs"></i>
             </button>
-            <button id="btnExport" class="bg-white text-primary p-2 rounded-full shadow hover:bg-gray-100 transition w-9 h-9 flex items-center justify-center" title="Export PDF">
-                <i class="fa-solid fa-file-pdf"></i>
+            <button id="btnInstall" class="hidden bg-white text-primary p-2 rounded-full shadow hover:bg-gray-100 transition w-8 h-8 flex items-center justify-center" title="Install App">
+                <i class="fa-solid fa-download text-xs"></i>
             </button>
-            <button id="btnLogout" class="bg-white text-danger p-2 rounded-full shadow hover:bg-red-50 transition w-9 h-9 flex items-center justify-center" title="Logout">
-                <i class="fa-solid fa-right-from-bracket"></i>
+            <button id="btnExport" class="bg-white text-primary p-2 rounded-full shadow hover:bg-gray-100 transition w-8 h-8 flex items-center justify-center" title="Export PDF">
+                <i class="fa-solid fa-file-pdf text-xs"></i>
+            </button>
+            <button id="btnLogout" class="bg-white text-danger p-2 rounded-full shadow hover:bg-red-50 transition w-8 h-8 flex items-center justify-center" title="Logout">
+                <i class="fa-solid fa-right-from-bracket text-xs"></i>
             </button>
         </div>
     </header>
@@ -147,6 +159,32 @@
                 </div>
                 <div id="publicNewsList" class="space-y-4">
                     <p class="text-center text-sm text-gray-400 py-4 italic">Memuat kabar terbaru...</p>
+                </div>
+            </div>
+
+            <!-- Seksi Kotak Aspirasi & Saran -->
+            <div id="sectionAspirasi" class="scroll-mt-16 pt-1">
+                <div class="bg-gradient-to-br from-blue-700 via-blue-600 to-indigo-700 rounded-2xl p-5 text-white shadow-md relative overflow-hidden">
+                    <img src="./logo-pmii.png" alt="Logo PMII" class="absolute -right-6 -bottom-6 w-32 h-32 object-contain opacity-15 pointer-events-none select-none">
+                    <div class="flex items-center gap-2.5 mb-2 relative z-10">
+                        <div class="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center text-sm font-bold text-yellow-300">
+                            <i class="fa-solid fa-comment-dots"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-black text-white">Kotak Aspirasi & Ide Kader</h3>
+                            <p class="text-[10px] text-blue-100 font-medium">Sampaikan saran, kritik, atau ide untuk kemajuan PMII Sambas</p>
+                        </div>
+                    </div>
+                    <form id="formAspirasi" class="mt-3 space-y-2.5 relative z-10">
+                        <div class="grid grid-cols-2 gap-2">
+                            <input type="text" id="aspirasiNama" class="w-full px-3 py-2 rounded-xl bg-white/10 border border-white/20 text-xs text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-yellow-400" placeholder="Nama Anda (Bisa Anonim)" required>
+                            <input type="text" id="aspirasiAsal" class="w-full px-3 py-2 rounded-xl bg-white/10 border border-white/20 text-xs text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-yellow-400" placeholder="Komisariat / Rayon / Alumni">
+                        </div>
+                        <textarea id="aspirasiPesan" rows="2" class="w-full px-3 py-2 rounded-xl bg-white/10 border border-white/20 text-xs text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-yellow-400" placeholder="Tuliskan aspirasi, kritik membangun, atau ide kegiatan sahabat..." required></textarea>
+                        <button type="submit" id="btnKirimAspirasi" class="w-full bg-yellow-400 hover:bg-yellow-300 text-blue-950 font-extrabold py-2.5 rounded-xl text-xs shadow transition flex items-center justify-center gap-1.5 active:scale-98">
+                            <i class="fa-solid fa-paper-plane"></i> <span id="txtBtnAspirasi">Kirim Aspirasi</span>
+                        </button>
+                    </form>
                 </div>
             </div>
 
@@ -297,6 +335,22 @@
                 <button class="kas-filter-btn text-xs font-bold px-4 py-1.5 rounded-full bg-gray-100 text-gray-500 whitespace-nowrap transition" data-period="week">1 Minggu</button>
                 <button class="kas-filter-btn text-xs font-bold px-4 py-1.5 rounded-full bg-gray-100 text-gray-500 whitespace-nowrap transition" data-period="month">1 Bulan</button>
                 <button class="kas-filter-btn text-xs font-bold px-4 py-1.5 rounded-full bg-gray-100 text-gray-500 whitespace-nowrap transition" data-period="year">1 Tahun</button>
+            </div>
+
+            <!-- Analisis Grafik Arus Kas -->
+            <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 mb-5">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                        <i class="fa-solid fa-chart-pie text-primary"></i> Analisis Arus Kas
+                    </h3>
+                    <div class="flex bg-gray-100 p-0.5 rounded-lg text-[10px] font-bold">
+                        <button type="button" id="btnChartKategori" class="px-2.5 py-1 rounded-md bg-white text-primary shadow-xs transition">Kategori</button>
+                        <button type="button" id="btnChartTren" class="px-2.5 py-1 rounded-md text-gray-500 hover:text-gray-800 transition">Tren Arus</button>
+                    </div>
+                </div>
+                <div class="relative h-44 w-full flex items-center justify-center">
+                    <canvas id="financeChart"></canvas>
+                </div>
             </div>
 
             <h3 class="text-base font-bold text-gray-700 mb-3">Transaksi Kas Umum</h3>
@@ -481,6 +535,19 @@
             <div id="usersListContainer" class="space-y-3">
                 <div class="text-center text-gray-400 py-10 italic text-sm">Memuat daftar akun...</div>
             </div>
+
+            <!-- Aspirasi Masuk Section (Super Admin) -->
+            <div class="mt-8 pt-6 border-t border-gray-200">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="text-sm font-bold text-gray-800 flex items-center">
+                        <i class="fa-solid fa-comment-dots text-primary mr-2"></i> Kotak Aspirasi Masuk
+                    </h3>
+                    <span class="text-xs text-primary font-semibold" id="txtTotalAspirasiCount">0 Pesan</span>
+                </div>
+                <div id="aspirasiListContainer" class="space-y-3">
+                    <div class="text-center text-gray-400 py-6 italic text-sm">Belum ada aspirasi masuk.</div>
+                </div>
+            </div>
         </section>
 
     </main>
@@ -545,9 +612,12 @@
                     </div>
                 </div>
             </div>
-            <div class="p-4 border-t flex space-x-3 bg-gray-50">
-                <button id="btnDeleteTx" class="flex-1 py-2 bg-red-100 text-red-600 font-bold rounded-lg text-sm hover:bg-red-200 transition border border-red-200">
-                    <i class="fa-solid fa-trash-can mr-1"></i> Hapus
+            <div class="p-4 border-t flex space-x-2 bg-gray-50">
+                <button id="btnCetakKuitansi" class="flex-1 py-2.5 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl text-xs transition flex items-center justify-center gap-1.5 shadow-sm hidden">
+                    <i class="fa-solid fa-receipt"></i> Kuitansi
+                </button>
+                <button id="btnDeleteTx" class="flex-1 py-2.5 bg-red-100 text-red-600 font-bold rounded-xl text-xs hover:bg-red-200 transition border border-red-200 flex items-center justify-center gap-1.5">
+                    <i class="fa-solid fa-trash-can"></i> Hapus
                 </button>
             </div>
         </div>
@@ -710,6 +780,16 @@
                 <div id="readerNewsContent" class="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
                     Isi berita...
                 </div>
+
+                <!-- Share Bar -->
+                <div class="pt-4 border-t border-gray-100 flex items-center justify-between gap-2">
+                    <button type="button" id="btnShareNewsWA" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition active:scale-95">
+                        <i class="fa-brands fa-whatsapp text-sm"></i> Bagikan ke WhatsApp
+                    </button>
+                    <button type="button" id="btnCopyNewsLink" class="bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 text-gray-700 dark:text-gray-200 font-bold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-1.5 transition active:scale-95">
+                        <i class="fa-solid fa-copy"></i> Salin Rilis
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -838,8 +918,9 @@
         </div>
     </div>
 
-    <!-- Hidden PDF Template -->
+    <!-- Hidden PDF Templates -->
     <div id="pdfTemplate" class="hidden"></div>
+    <div id="kuitansiTemplate" class="hidden"></div>
 
     <script type="module" src="neon-config.js"></script>
     <script type="module" src="app.js"></script>
