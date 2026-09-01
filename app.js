@@ -777,10 +777,34 @@ const checkAuthAndRoute = () => {
     }
 };
 
-document.getElementById('btnGoToLogin')?.addEventListener('click', () => {
-    document.getElementById('landingHeader')?.classList.add('hidden');
-    showView('viewLogin');
-});
+// Secret Login Trigger: Klik logo navbar 3 kali untuk membuka Login
+let logoClickCount = 0;
+let logoClickTimer = null;
+
+const triggerSecretLogin = () => {
+    logoClickCount++;
+    const logoImg = document.getElementById('landingHeaderLogo');
+    if (logoImg) {
+        logoImg.classList.add('scale-125', 'rotate-12');
+        setTimeout(() => logoImg.classList.remove('scale-125', 'rotate-12'), 250);
+    }
+
+    clearTimeout(logoClickTimer);
+
+    if (logoClickCount >= 3) {
+        logoClickCount = 0;
+        document.getElementById('landingHeader')?.classList.add('hidden');
+        showView('viewLogin');
+        return;
+    }
+
+    logoClickTimer = setTimeout(() => {
+        logoClickCount = 0;
+    }, 1200);
+};
+
+document.getElementById('landingSecretLogoTrigger')?.addEventListener('click', triggerSecretLogin);
+document.getElementById('landingHeaderLogo')?.addEventListener('click', triggerSecretLogin);
 
 document.getElementById('btnBackToLanding')?.addEventListener('click', () => {
     checkAuthAndRoute();
@@ -1269,15 +1293,16 @@ window.viewNewsDetail = (newsId) => {
         containerEl?.classList.remove('hidden');
         if (gridEl) {
             gridEl.innerHTML = '';
-            // If 1 image, full width. If > 1, grid of 2
-            gridEl.className = images.length === 1 ? 'grid grid-cols-1 gap-2' : 'grid grid-cols-2 gap-2';
+            gridEl.className = 'space-y-3';
             images.forEach((imgB64, i) => {
                 const imgCard = document.createElement('div');
-                imgCard.className = `rounded-xl overflow-hidden border shadow-sm bg-gray-100 cursor-pointer relative group ${images.length === 1 ? 'max-h-64' : 'h-32'}`;
+                imgCard.className = 'rounded-2xl overflow-hidden border border-gray-200 shadow-sm bg-white cursor-pointer relative group flex items-center justify-center p-1 transition hover:shadow-md';
                 imgCard.innerHTML = `
-                    <img src="${imgB64}" class="w-full h-full object-cover" alt="Foto ${i + 1}">
-                    <div class="absolute inset-0 bg-black/30 hidden group-hover:flex items-center justify-center text-white transition">
-                        <i class="fa-solid fa-magnifying-glass-plus text-lg"></i>
+                    <img src="${imgB64}" class="w-full h-auto max-h-[70vh] object-contain rounded-xl" alt="Foto Dokumentasi ${i + 1}">
+                    <div class="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition rounded-xl">
+                        <span class="bg-black/70 px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 backdrop-blur-xs">
+                            <i class="fa-solid fa-magnifying-glass-plus"></i> Ukuran Penuh
+                        </span>
                     </div>
                 `;
                 imgCard.onclick = () => {
