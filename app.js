@@ -7,12 +7,53 @@ let kegiatanList = [];       // daftar kegiatan
 let kegTransactions = [];    // transaksi kegiatan aktif
 let beritaList = [];         // daftar berita
 let beritaFilter = 'all';    // filter status berita
-let currentNewsImageBase64 = null;
+let currentImagesBase64 = [];       // array of images for transaction
+let currentNewsImagesBase64 = [];   // array of images for news
 let activeKegiatanId = null; // kegiatan yang sedang dibuka
 let activeKegiatanData = null;
-let currentImageBase64 = null;
 let currentActiveTxId = null;
 let kasPeriod = 'all';
+
+// Helper for multi-image parsing
+const parseImages = (imgData) => {
+    if (!imgData) return [];
+    if (Array.isArray(imgData)) return imgData;
+    if (typeof imgData === 'string') {
+        const trimmed = imgData.trim();
+        if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+            try {
+                return JSON.parse(trimmed);
+            } catch (e) {
+                return [imgData];
+            }
+        }
+        return [imgData];
+    }
+    return [];
+};
+
+const compressImageFile = (file) => {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (ev) => {
+            const img = new Image();
+            img.src = ev.target.result;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const MAX = 800;
+                let w = img.width, h = img.height;
+                if (w > h) { if (w > MAX) { h *= MAX / w; w = MAX; } }
+                else { if (h > MAX) { w *= MAX / h; h = MAX; } }
+                canvas.width = w; canvas.height = h;
+                canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                resolve(canvas.toDataURL('image/jpeg', 0.6));
+            };
+            img.onerror = () => resolve(null);
+        };
+        reader.onerror = () => resolve(null);
+    });
+};
 
 // ===================== FORMATTERS =====================
 const formatRupiah = (n) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n);
@@ -184,38 +225,60 @@ document.getElementById('btnBackFromForm')?.addEventListener('click', () => {
     }
 });
 
-// ===================== IMAGE HANDLING =====================
-const handleImageSelect = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = (ev) => {
-        const img = new Image();
-        img.src = ev.target.result;
-        img.onload = () => {
-            const canvas = document.createElement('canvas');
-            const MAX = 500;
-            let w = img.width, h = img.height;
-            if (w > h) { if (w > MAX) { h *= MAX / w; w = MAX; } }
-            else { if (h > MAX) { w *= MAX / h; h = MAX; } }
-            canvas.width = w; canvas.height = h;
-            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-            currentImageBase64 = canvas.toDataURL('image/jpeg', 0.5);
-            imgPreview.src = currentImageBase64;
-            previewContainer.classList.remove('hidden');
-        };
-    };
+// ===================== TX MULTI-IMAGE HANDLING =====================
+const renderTxImageThumbnails = () => {
+    const container = document.getElementById('previewContainer');
+    const grid = document.getElementById('txImageThumbnailsGrid');
+    const countEl = document.getElementById('txtCountImages');
+    if (!container || !grid) return;
+
+    grid.innerHTML = '';
+    if (currentImagesBase64.length === 0) {
+        container.classList.add('hidden');
+        return;
+    }
+
+    container.classList.remove('hidden');
+    if (countEl) countEl.textContent = `${currentImagesBase64.length} Bukti Foto Terpilih`;
+
+    currentImagesBase64.forEach((b64, idx) => {
+        const item = document.createElement('div');
+        item.className = 'relative group rounded-xl overflow-hidden border border-gray-200 bg-white aspect-square shadow-2xs';
+        item.innerHTML = `
+            <img src="${b64}" class="w-full h-full object-cover" alt="Thumb ${idx + 1}">
+            <button type="button" onclick="window.removeTxImage(${idx})" class="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center shadow text-[10px] hover:bg-red-600">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        `;
+        grid.appendChild(item);
+    });
 };
 
-document.getElementById('inputFileGallery')?.addEventListener('change', handleImageSelect);
-document.getElementById('inputFileCamera')?.addEventListener('change', handleImageSelect);
-btnRemoveImage?.addEventListener('click', () => {
-    currentImageBase64 = null; imgPreview.src = '';
-    previewContainer.classList.add('hidden');
+window.removeTxImage = (idx) => {
+    currentImagesBase64.splice(idx, 1);
+    renderTxImageThumbnails();
+};
+
+document.getElementById('btnClearAllImages')?.addEventListener('click', () => {
+    currentImagesBase64 = [];
+    renderTxImageThumbnails();
     const f1 = document.getElementById('inputFileGallery'); if (f1) f1.value = '';
     const f2 = document.getElementById('inputFileCamera'); if (f2) f2.value = '';
 });
+
+const handleTxImageSelect = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    for (const file of files) {
+        const compressed = await compressImageFile(file);
+        if (compressed) currentImagesBase64.push(compressed);
+    }
+    renderTxImageThumbnails();
+    e.target.value = '';
+};
+
+document.getElementById('inputFileGallery')?.addEventListener('change', handleTxImageSelect);
+document.getElementById('inputFileCamera')?.addEventListener('change', handleTxImageSelect);
 
 // ===================== SUBMIT TRANSACTION =====================
 txForm.addEventListener('submit', async (e) => {
@@ -224,6 +287,7 @@ txForm.addEventListener('submit', async (e) => {
     if (isNaN(nominalRaw) || nominalRaw <= 0) { Swal.fire('Error', 'Nominal tidak valid', 'error'); return; }
 
     const kegId = inputKegiatanId.value || null;
+    const serializedImages = currentImagesBase64.length > 0 ? JSON.stringify(currentImagesBase64) : null;
 
     try {
         btnSubmitTx.disabled = true; btnSubmitText.textContent = 'Menyimpan...'; spinnerSubmit.classList.remove('hidden');
@@ -235,7 +299,7 @@ txForm.addEventListener('submit', async (e) => {
 
         await sql`
             INSERT INTO transaksi (type, nominal, judul, kategori, tanggal, catatan, image_base64, kegiatan_id) 
-            VALUES (${inputType.value}, ${nominalRaw}, ${inputJudul.value}, ${inputKategori.value}, ${inputTanggal.value}, ${inputCatatan.value}, ${currentImageBase64}, ${kegId})
+            VALUES (${inputType.value}, ${nominalRaw}, ${inputJudul.value}, ${inputKategori.value}, ${inputTanggal.value}, ${inputCatatan.value}, ${serializedImages}, ${kegId})
         `;
 
         Swal.fire({ icon: 'success', title: 'Berhasil', text: 'Transaksi berhasil disimpan!', timer: 1500, showConfirmButton: false });
@@ -259,8 +323,10 @@ txForm.addEventListener('submit', async (e) => {
 
 const resetForm = () => {
     txForm.reset(); inputNominal.value = ''; inputTanggal.valueAsDate = new Date();
-    currentImageBase64 = null; imgPreview.src = ''; previewContainer.classList.add('hidden');
-    document.getElementById('inputFileGallery').value = ''; document.getElementById('inputFileCamera').value = '';
+    currentImagesBase64 = [];
+    renderTxImageThumbnails();
+    const f1 = document.getElementById('inputFileGallery'); if (f1) f1.value = '';
+    const f2 = document.getElementById('inputFileCamera'); if (f2) f2.value = '';
     // Reset type buttons
     typeBtns.forEach(b => { b.classList.remove('bg-white', 'shadow', 'text-success', 'text-danger'); b.classList.add('text-gray-500'); });
     typeBtns[0].classList.add('bg-white', 'shadow', 'text-success'); typeBtns[0].classList.remove('text-gray-500');
@@ -506,20 +572,37 @@ const openDetailModal = (tx) => {
     document.getElementById('modalNominal').className = `text-xl font-extrabold ${isMasuk ? 'text-green-600' : 'text-red-600'}`;
     document.getElementById('modalCatatan').textContent = tx.catatan || '-';
 
-    const imgEl = document.getElementById('modalImage');
+    const images = parseImages(tx.image_base64);
     const noImgEl = document.getElementById('modalNoImage');
+    const gridEl = document.getElementById('modalImagesGrid');
 
-    if (tx.image_base64) {
-        imgEl.src = tx.image_base64; imgEl.classList.remove('hidden'); noImgEl.classList.add('hidden');
-        modalImageContainer.onclick = () => {
-            document.getElementById('zoomedImage').src = tx.image_base64;
-            document.getElementById('btnDownloadImage').href = tx.image_base64;
-            document.getElementById('imageZoomModal').classList.remove('hidden');
-            document.getElementById('imageZoomModal').classList.add('flex');
-        };
+    if (images.length > 0) {
+        noImgEl?.classList.add('hidden');
+        gridEl?.classList.remove('hidden');
+        if (gridEl) {
+            gridEl.innerHTML = '';
+            images.forEach((imgB64, i) => {
+                const imgCard = document.createElement('div');
+                imgCard.className = 'border rounded-xl bg-gray-100 h-28 flex items-center justify-center overflow-hidden cursor-pointer group relative shadow-2xs';
+                imgCard.innerHTML = `
+                    <img src="${imgB64}" class="w-full h-full object-cover" alt="Bukti ${i + 1}">
+                    <div class="absolute inset-0 bg-black/40 hidden group-hover:flex items-center justify-center text-white transition">
+                        <i class="fa-solid fa-magnifying-glass-plus text-lg"></i>
+                    </div>
+                `;
+                imgCard.onclick = () => {
+                    document.getElementById('zoomedImage').src = imgB64;
+                    document.getElementById('btnDownloadImage').href = imgB64;
+                    document.getElementById('imageZoomModal').classList.remove('hidden');
+                    document.getElementById('imageZoomModal').classList.add('flex');
+                };
+                gridEl.appendChild(imgCard);
+            });
+        }
     } else {
-        imgEl.src = ''; imgEl.classList.add('hidden'); noImgEl.classList.remove('hidden');
-        modalImageContainer.onclick = null;
+        noImgEl?.classList.remove('hidden');
+        gridEl?.classList.add('hidden');
+        if (gridEl) gridEl.innerHTML = '';
     }
 
     txModal.classList.add('active');
@@ -831,13 +914,19 @@ const renderBeritaList = () => {
 
     filtered.forEach(b => {
         const isPub = b.status === 'PUBLISHED';
+        const images = parseImages(b.gambar_base64);
+        const coverImg = images.length > 0 ? images[0] : null;
+
         const card = document.createElement('div');
         card.className = 'bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-3 transition hover:shadow-md';
         
         card.innerHTML = `
             <div class="flex gap-3 items-start">
-                ${b.gambar_base64 ? `
-                    <img src="${b.gambar_base64}" class="w-16 h-16 rounded-xl object-cover border shrink-0" alt="Thumb">
+                ${coverImg ? `
+                    <div class="relative w-16 h-16 rounded-xl overflow-hidden border shrink-0">
+                        <img src="${coverImg}" class="w-full h-full object-cover" alt="Thumb">
+                        ${images.length > 1 ? `<span class="absolute bottom-0.5 right-0.5 bg-black/70 text-white text-[9px] font-bold px-1 rounded">+${images.length - 1}</span>` : ''}
+                    </div>
                 ` : `
                     <div class="w-16 h-16 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0 text-primary">
                         <i class="fa-solid fa-newspaper text-xl"></i>
@@ -852,10 +941,11 @@ const renderBeritaList = () => {
                         <span>&bull;</span>
                         <i class="fa-solid fa-user-pen"></i> ${b.author || 'Narator'}
                     </p>
-                    <div class="mt-2">
+                    <div class="mt-2 flex items-center gap-2">
                         <span class="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${isPub ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-gray-100 text-gray-600 border border-gray-200'}">
                             ${isPub ? '🟢 Terbit' : '⚪ Draf'}
                         </span>
+                        ${images.length > 0 ? `<span class="text-[10px] text-gray-400 font-semibold"><i class="fa-solid fa-images mr-1"></i>${images.length} Foto</span>` : ''}
                     </div>
                 </div>
             </div>
@@ -888,14 +978,18 @@ const renderPublicNewsList = () => {
     }
 
     published.forEach(b => {
+        const images = parseImages(b.gambar_base64);
+        const coverImg = images.length > 0 ? images[0] : null;
+
         const card = document.createElement('div');
         card.className = 'bg-white p-4 rounded-2xl shadow-sm border border-gray-100 transition hover:shadow-md cursor-pointer group flex flex-col gap-2.5';
         card.onclick = () => window.viewNewsDetail(b.id);
         
         card.innerHTML = `
-            ${b.gambar_base64 ? `
-                <div class="w-full h-36 rounded-xl overflow-hidden mb-1 border bg-gray-50">
-                    <img src="${b.gambar_base64}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" alt="${b.judul}">
+            ${coverImg ? `
+                <div class="w-full h-36 rounded-xl overflow-hidden mb-1 border bg-gray-50 relative">
+                    <img src="${coverImg}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" alt="${b.judul}">
+                    ${images.length > 1 ? `<span class="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] font-bold px-2 py-0.5 rounded-md backdrop-blur-xs"><i class="fa-solid fa-images mr-1"></i>${images.length} Foto</span>` : ''}
                 </div>
             ` : ''}
             <div>
@@ -916,6 +1010,60 @@ const renderPublicNewsList = () => {
 const newsEditorModal = document.getElementById('newsEditorModal');
 const newsReaderModal = document.getElementById('newsReaderModal');
 
+const renderNewsImageThumbnails = () => {
+    const container = document.getElementById('newsPreviewContainer');
+    const grid = document.getElementById('newsImageThumbnailsGrid');
+    const countEl = document.getElementById('txtCountNewsImages');
+    if (!container || !grid) return;
+
+    grid.innerHTML = '';
+    if (currentNewsImagesBase64.length === 0) {
+        container.classList.add('hidden');
+        return;
+    }
+
+    container.classList.remove('hidden');
+    if (countEl) countEl.textContent = `${currentNewsImagesBase64.length} Foto Dokumentasi Terpilih`;
+
+    currentNewsImagesBase64.forEach((b64, idx) => {
+        const item = document.createElement('div');
+        item.className = 'relative group rounded-xl overflow-hidden border border-gray-200 bg-white aspect-square shadow-2xs';
+        item.innerHTML = `
+            <img src="${b64}" class="w-full h-full object-cover" alt="Foto ${idx + 1}">
+            <button type="button" onclick="window.removeNewsImage(${idx})" class="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center shadow text-[10px] hover:bg-red-600">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        `;
+        grid.appendChild(item);
+    });
+};
+
+window.removeNewsImage = (idx) => {
+    currentNewsImagesBase64.splice(idx, 1);
+    renderNewsImageThumbnails();
+};
+
+document.getElementById('btnClearAllNewsImages')?.addEventListener('click', () => {
+    currentNewsImagesBase64 = [];
+    renderNewsImageThumbnails();
+    const f1 = document.getElementById('inputNewsFileGallery'); if (f1) f1.value = '';
+    const f2 = document.getElementById('inputNewsFileCamera'); if (f2) f2.value = '';
+});
+
+const handleNewsImageSelect = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    for (const file of files) {
+        const compressed = await compressImageFile(file);
+        if (compressed) currentNewsImagesBase64.push(compressed);
+    }
+    renderNewsImageThumbnails();
+    e.target.value = '';
+};
+
+document.getElementById('inputNewsFileGallery')?.addEventListener('change', handleNewsImageSelect);
+document.getElementById('inputNewsFileCamera')?.addEventListener('change', handleNewsImageSelect);
+
 const openNewsEditor = (newsItem = null) => {
     document.getElementById('inputNewsId').value = newsItem?.id || '';
     document.getElementById('inputNewsTitle').value = newsItem?.judul || '';
@@ -928,17 +1076,8 @@ const openNewsEditor = (newsItem = null) => {
     const qts = document.getElementById('aiInputQuotes'); if (qts) qts.value = '';
     const tone = document.getElementById('aiInputTone'); if (tone) tone.value = 'formal';
 
-    currentNewsImageBase64 = newsItem?.gambar_base64 || null;
-    const previewContainer = document.getElementById('newsPreviewContainer');
-    const imgPreview = document.getElementById('imgNewsPreview');
-    
-    if (currentNewsImageBase64) {
-        imgPreview.src = currentNewsImageBase64;
-        previewContainer.classList.remove('hidden');
-    } else {
-        imgPreview.src = '';
-        previewContainer.classList.add('hidden');
-    }
+    currentNewsImagesBase64 = parseImages(newsItem?.gambar_base64);
+    renderNewsImageThumbnails();
 
     const titleEl = document.getElementById('newsEditorModalTitle');
     if (titleEl) {
@@ -954,7 +1093,8 @@ const openNewsEditor = (newsItem = null) => {
 const closeNewsEditor = () => {
     newsEditorModal?.classList.add('hidden');
     newsEditorModal?.classList.remove('flex');
-    currentNewsImageBase64 = null;
+    currentNewsImagesBase64 = [];
+    renderNewsImageThumbnails();
     document.getElementById('newsForm')?.reset();
 };
 
@@ -1047,40 +1187,6 @@ const generateAiNarrative = async () => {
 
 document.getElementById('btnGenerateAiNarrative')?.addEventListener('click', generateAiNarrative);
 
-// News Image Handlers
-const handleNewsImageSelect = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = (ev) => {
-        const img = new Image();
-        img.src = ev.target.result;
-        img.onload = () => {
-            const canvas = document.createElement('canvas');
-            const MAX = 800;
-            let w = img.width, h = img.height;
-            if (w > h) { if (w > MAX) { h *= MAX / w; w = MAX; } }
-            else { if (h > MAX) { w *= MAX / h; h = MAX; } }
-            canvas.width = w; canvas.height = h;
-            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-            currentNewsImageBase64 = canvas.toDataURL('image/jpeg', 0.6);
-            document.getElementById('imgNewsPreview').src = currentNewsImageBase64;
-            document.getElementById('newsPreviewContainer').classList.remove('hidden');
-        };
-    };
-};
-
-document.getElementById('inputNewsFileGallery')?.addEventListener('change', handleNewsImageSelect);
-document.getElementById('inputNewsFileCamera')?.addEventListener('change', handleNewsImageSelect);
-document.getElementById('btnRemoveNewsImage')?.addEventListener('click', () => {
-    currentNewsImageBase64 = null;
-    document.getElementById('imgNewsPreview').src = '';
-    document.getElementById('newsPreviewContainer').classList.add('hidden');
-    const f1 = document.getElementById('inputNewsFileGallery'); if (f1) f1.value = '';
-    const f2 = document.getElementById('inputNewsFileCamera'); if (f2) f2.value = '';
-});
-
 // Save News Form Submit
 document.getElementById('newsForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -1089,6 +1195,7 @@ document.getElementById('newsForm')?.addEventListener('submit', async (e) => {
     const isi = document.getElementById('inputNewsContent').value.trim();
     const status = document.getElementById('inputNewsStatus').value;
     const author = currentUser?.username || 'Narator PMII';
+    const serializedImages = currentNewsImagesBase64.length > 0 ? JSON.stringify(currentNewsImagesBase64) : null;
 
     if (!judul || !isi) {
         Swal.fire('Perhatian', 'Judul dan isi berita wajib diisi', 'warning');
@@ -1108,7 +1215,7 @@ document.getElementById('newsForm')?.addEventListener('submit', async (e) => {
             // Update existing
             await sql`
                 UPDATE berita 
-                SET judul = ${judul}, isi = ${isi}, status = ${status}, gambar_base64 = ${currentNewsImageBase64}
+                SET judul = ${judul}, isi = ${isi}, status = ${status}, gambar_base64 = ${serializedImages}
                 WHERE id = ${id}
             `;
             Swal.fire({ icon: 'success', title: 'Berhasil', text: 'Berita berhasil diperbarui!', timer: 1500, showConfirmButton: false });
@@ -1116,7 +1223,7 @@ document.getElementById('newsForm')?.addEventListener('submit', async (e) => {
             // Insert new
             await sql`
                 INSERT INTO berita (judul, isi, status, author, gambar_base64, published_at) 
-                VALUES (${judul}, ${isi}, ${status}, ${author}, ${currentNewsImageBase64}, ${status === 'PUBLISHED' ? new Date() : null})
+                VALUES (${judul}, ${isi}, ${status}, ${author}, ${serializedImages}, ${status === 'PUBLISHED' ? new Date() : null})
             `;
             Swal.fire({ icon: 'success', title: 'Berhasil', text: 'Berita berhasil dibuat!', timer: 1500, showConfirmButton: false });
         }
@@ -1154,13 +1261,37 @@ window.viewNewsDetail = (newsId) => {
         }
     }
 
-    const imgContainer = document.getElementById('readerImageContainer');
-    const imgEl = document.getElementById('readerNewsImage');
-    if (news.gambar_base64) {
-        imgEl.src = news.gambar_base64;
-        imgContainer.classList.remove('hidden');
+    const images = parseImages(news.gambar_base64);
+    const containerEl = document.getElementById('readerImagesContainer');
+    const gridEl = document.getElementById('readerImagesGrid');
+
+    if (images.length > 0) {
+        containerEl?.classList.remove('hidden');
+        if (gridEl) {
+            gridEl.innerHTML = '';
+            // If 1 image, full width. If > 1, grid of 2
+            gridEl.className = images.length === 1 ? 'grid grid-cols-1 gap-2' : 'grid grid-cols-2 gap-2';
+            images.forEach((imgB64, i) => {
+                const imgCard = document.createElement('div');
+                imgCard.className = `rounded-xl overflow-hidden border shadow-sm bg-gray-100 cursor-pointer relative group ${images.length === 1 ? 'max-h-64' : 'h-32'}`;
+                imgCard.innerHTML = `
+                    <img src="${imgB64}" class="w-full h-full object-cover" alt="Foto ${i + 1}">
+                    <div class="absolute inset-0 bg-black/30 hidden group-hover:flex items-center justify-center text-white transition">
+                        <i class="fa-solid fa-magnifying-glass-plus text-lg"></i>
+                    </div>
+                `;
+                imgCard.onclick = () => {
+                    document.getElementById('zoomedImage').src = imgB64;
+                    document.getElementById('btnDownloadImage').href = imgB64;
+                    document.getElementById('imageZoomModal').classList.remove('hidden');
+                    document.getElementById('imageZoomModal').classList.add('flex');
+                };
+                gridEl.appendChild(imgCard);
+            });
+        }
     } else {
-        imgContainer.classList.add('hidden');
+        containerEl?.classList.add('hidden');
+        if (gridEl) gridEl.innerHTML = '';
     }
 
     newsReaderModal?.classList.remove('hidden');
@@ -1170,6 +1301,21 @@ window.viewNewsDetail = (newsId) => {
 document.getElementById('btnCloseNewsReader')?.addEventListener('click', () => {
     newsReaderModal?.classList.add('hidden');
     newsReaderModal?.classList.remove('flex');
+});
+
+// Struktur Modal Event Listeners
+const strukturModal = document.getElementById('strukturModal');
+document.getElementById('btnOpenStrukturModal')?.addEventListener('click', () => {
+    strukturModal?.classList.remove('hidden');
+    strukturModal?.classList.add('flex');
+});
+document.getElementById('btnCloseStrukturModal')?.addEventListener('click', () => {
+    strukturModal?.classList.add('hidden');
+    strukturModal?.classList.remove('flex');
+});
+document.getElementById('btnDismissStrukturModal')?.addEventListener('click', () => {
+    strukturModal?.classList.add('hidden');
+    strukturModal?.classList.remove('flex');
 });
 
 window.editNewsItem = (newsId) => {
