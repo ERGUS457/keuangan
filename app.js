@@ -109,6 +109,20 @@ const btnSubmitTx = document.getElementById('btnSubmitTx');
 const btnSubmitText = document.getElementById('btnSubmitText');
 const spinnerSubmit = document.getElementById('spinnerSubmit');
 
+const kategoriPemasukan = ['Iuran Anggota', 'Sponsorship', 'Donasi', 'Pencairan Dana', 'Lainnya'];
+const kategoriPengeluaran = ['Konsumsi', 'Perlengkapan', 'Transportasi', 'Jasa/Tukang', 'Operasional', 'Lainnya'];
+
+const updateKategoriOptions = (type) => {
+    const options = type === 'in' ? kategoriPemasukan : kategoriPengeluaran;
+    inputKategori.innerHTML = '';
+    options.forEach(opt => {
+        const el = document.createElement('option');
+        el.value = opt;
+        el.textContent = opt;
+        inputKategori.appendChild(el);
+    });
+};
+
 typeBtns.forEach(btn => {
     btn.addEventListener('click', () => {
         const type = btn.dataset.type;
@@ -116,8 +130,11 @@ typeBtns.forEach(btn => {
         typeBtns.forEach(b => { b.classList.remove('bg-white', 'shadow', 'text-success', 'text-danger'); b.classList.add('text-gray-500'); });
         btn.classList.add('bg-white', 'shadow'); btn.classList.remove('text-gray-500');
         if (type === 'in') btn.classList.add('text-success'); else btn.classList.add('text-danger');
+        updateKategoriOptions(type);
     });
 });
+// Initialize default categories
+updateKategoriOptions('in');
 
 inputNominal.addEventListener('input', function() {
     let v = this.value.replace(/[^0-9]/g, '');
@@ -233,6 +250,7 @@ const resetForm = () => {
     typeBtns.forEach(b => { b.classList.remove('bg-white', 'shadow', 'text-success', 'text-danger'); b.classList.add('text-gray-500'); });
     typeBtns[0].classList.add('bg-white', 'shadow', 'text-success'); typeBtns[0].classList.remove('text-gray-500');
     inputType.value = 'in';
+    updateKategoriOptions('in');
 };
 
 // ===================== FETCH DATA =====================
@@ -644,3 +662,32 @@ const init = async () => {
 };
 
 init();
+
+// ===================== PWA & INSTALL =====================
+let deferredPrompt;
+const btnInstall = document.getElementById('btnInstall');
+
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    btnInstall.classList.remove('hidden');
+});
+
+btnInstall.addEventListener('click', async () => {
+    if (deferredPrompt) {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+            btnInstall.classList.add('hidden');
+        }
+        deferredPrompt = null;
+    }
+});
+
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(err => {
+            console.error('ServiceWorker registration failed: ', err);
+        });
+    });
+}
