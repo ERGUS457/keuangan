@@ -1,9 +1,11 @@
 import { sql } from './neon-config.js';
 
 // ===================== STATE =====================
-let kasTransactions = [];    // transaksi kas umum (kegiatan_id IS NULL)
+let currentUser = JSON.parse(localStorage.getItem('pmii_user') || 'null');
+let kasTransactions = [];    // transaksi kas umum
 let kegiatanList = [];       // daftar kegiatan
 let kegTransactions = [];    // transaksi kegiatan aktif
+let beritaList = [];         // daftar berita
 let activeKegiatanId = null; // kegiatan yang sedang dibuka
 let activeKegiatanData = null;
 let currentImageBase64 = null;
@@ -650,9 +652,169 @@ document.getElementById('btnExportKegiatan').addEventListener('click', () => {
     generatePDF(activeKegiatanData.nama, kegTransactions, 'Semua Transaksi');
 });
 
+// ===================== AUTH & ROUTING =====================
+const checkAuthAndRoute = () => {
+    document.getElementById('landingHeader').classList.add('hidden');
+    document.getElementById('mainHeader').classList.add('hidden');
+    document.getElementById('detailHeader').classList.add('hidden');
+    document.getElementById('bottomNav').classList.add('hidden');
+
+    if (!currentUser) {
+        document.getElementById('landingHeader').classList.remove('hidden');
+        showView('viewLanding');
+        return;
+    }
+
+    document.getElementById('mainHeader').classList.remove('hidden');
+    
+    if (currentUser.role === 'bendahara' || currentUser.role === 'super_admin') {
+        document.getElementById('bottomNav').classList.remove('hidden');
+        showView('viewKasUmum');
+    } else if (currentUser.role === 'narator') {
+        showView('viewDashboardBerita');
+    }
+};
+
+document.getElementById('btnGoToLogin').addEventListener('click', () => {
+    document.getElementById('landingHeader').classList.add('hidden');
+    showView('viewLogin');
+});
+
+document.getElementById('btnBackToLanding').addEventListener('click', () => {
+    checkAuthAndRoute();
+});
+
+document.getElementById('btnLogout').addEventListener('click', () => {
+    localStorage.removeItem('pmii_user');
+    currentUser = null;
+    checkAuthAndRoute();
+});
+
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const u = document.getElementById('loginUsername').value;
+    const p = document.getElementById('loginPassword').value;
+    
+    try {
+        Swal.showLoading();
+        const res = await sql`SELECT * FROM users WHERE username = ${u} AND password = ${p}`;
+        Swal.close();
+        
+        if (res && res.length > 0) {
+            currentUser = res[0];
+            localStorage.setItem('pmii_user', JSON.stringify(currentUser));
+            document.getElementById('loginForm').reset();
+            checkAuthAndRoute();
+        } else {
+            Swal.fire('Error', 'Username atau password salah', 'error');
+        }
+    } catch (err) {
+        Swal.fire('Error', 'Gagal menghubungi database', 'error');
+    }
+});
+
+// ===================== BERITA LOGIC =====================
+const fetchBerita = async () => {
+    if (!sql) return;
+    try {
+        beritaList = await sql`SELECT * FROM berita ORDER BY created_at DESC`;
+        renderBeritaList();
+    } catch (err) { console.error(err); }
+};
+
+const renderBeritaList = () => {
+    const publicContainer = document.getElementById('publicNewsList');
+    const adminContainer = document.getElementById('adminNewsList');
+    
+    publicContainer.innerHTML = '';
+    adminContainer.innerHTML = '';
+
+    if (beritaList.length === 0) {
+        publicContainer.innerHTML = '<p class="text-center text-sm text-gray-500 py-4">Belum ada berita dipublikasikan.</p>';
+        adminContainer.innerHTML = '<p class="text-center text-sm text-gray-500 py-4">Belum ada berita.</p>';
+        return;
+    }
+
+    beritaList.forEach(b => {
+        // Public list (hanya PUBLISHED)
+        if (b.status === 'PUBLISHED') {
+            publicContainer.innerHTML += `
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                    <h4 class="font-bold text-gray-800 text-lg">${b.judul}</h4>
+                    <p class="text-[10px] text-gray-500 mb-2">${formatDate(b.created_at)} &bull; Oleh ${b.author || 'Admin'}</p>
+                    <p class="text-sm text-gray-600 line-clamp-3">${b.isi}</p>
+                </div>
+            `;
+        }
+        
+        // Admin list
+        adminContainer.innerHTML += `
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-start">
+                <div>
+                    <h4 class="font-bold text-gray-800">${b.judul}</h4>
+                    <span class="text-[10px] font-bold px-2 py-1 rounded mt-1 inline-block ${b.status === 'PUBLISHED' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}">${b.status}</span>
+                </div>
+                <button onclick="hapusBerita('${b.id}')" class="text-red-500 p-2"><i class="fa-solid fa-trash"></i></button>
+            </div>
+        `;
+    });
+};
+
+document.getElementById('btnBuatBerita').addEventListener('click', async () => {
+    const { value: formValues } = await Swal.fire({
+        title: 'Tulis Berita',
+        html: `
+            <input id="swalJudulB" class="swal2-input" placeholder="Judul Berita" style="font-size:14px">
+            <textarea id="swalIsiB" class="swal2-textarea" placeholder="Isi Berita" style="font-size:14px; height:120px"></textarea>
+            <select id="swalStatusB" class="swal2-select" style="font-size:14px">
+                <option value="DRAFT">DRAFT</option>
+                <option value="PUBLISHED">PUBLISH SEKARANG</option>
+            </select>
+        `,
+        focusConfirm: false,
+        showCancelButton: true,
+        confirmButtonText: 'Simpan',
+        preConfirm: () => {
+            const j = document.getElementById('swalJudulB').value;
+            const i = document.getElementById('swalIsiB').value;
+            if (!j || !i) { Swal.showValidationMessage('Semua kolom wajib diisi'); return false; }
+            return {
+                judul: j, isi: i,
+                status: document.getElementById('swalStatusB').value
+            };
+        }
+    });
+
+    if (formValues) {
+        try {
+            await sql`INSERT INTO berita (judul, isi, status, author) VALUES (${formValues.judul}, ${formValues.isi}, ${formValues.status}, ${currentUser.username})`;
+            Swal.fire('Berhasil', 'Berita disimpan', 'success');
+            fetchBerita();
+        } catch (err) { Swal.fire('Error', 'Gagal menyimpan', 'error'); }
+    }
+});
+
+window.hapusBerita = async (id) => {
+    if (confirm('Yakin hapus berita ini?')) {
+        await sql`DELETE FROM berita WHERE id = ${id}`;
+        fetchBerita();
+    }
+};
+
 // ===================== INIT =====================
+const initDB = async () => {
+    if (!sql) return;
+    try {
+        await sql`CREATE TABLE IF NOT EXISTS users (id UUID DEFAULT gen_random_uuid() PRIMARY KEY, username VARCHAR(50) UNIQUE NOT NULL, password VARCHAR(100) NOT NULL, role VARCHAR(20) NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`;
+        await sql`INSERT INTO users (username, password, role) VALUES ('superadmin', 'admin123', 'super_admin'), ('bendahara', 'bendahara123', 'bendahara'), ('narator', 'narator123', 'narator') ON CONFLICT (username) DO NOTHING`;
+        await sql`CREATE TABLE IF NOT EXISTS berita (id UUID DEFAULT gen_random_uuid() PRIMARY KEY, judul VARCHAR(255) NOT NULL, isi TEXT NOT NULL, gambar_base64 TEXT, status VARCHAR(20) DEFAULT 'DRAFT', author VARCHAR(50), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, published_at TIMESTAMP)`;
+    } catch(e) { console.error('DB Init Error', e); }
+};
+
 const init = async () => {
-    await Promise.all([fetchKasUmum(), fetchKegiatanList()]);
+    await initDB();
+    await Promise.all([fetchKasUmum(), fetchKegiatanList(), fetchBerita()]);
+    checkAuthAndRoute();
 };
 
 init();
