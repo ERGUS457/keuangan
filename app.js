@@ -7,6 +7,7 @@ let kegiatanList = [];       // daftar kegiatan
 let kegTransactions = [];    // transaksi kegiatan aktif
 let beritaList = [];         // daftar berita
 let beritaFilter = 'all';    // filter status berita
+let usersList = [];          // daftar akun pengguna (super admin)
 let currentImagesBase64 = [];       // array of images for transaction
 let currentNewsImagesBase64 = [];   // array of images for news
 let activeKegiatanId = null; // kegiatan yang sedang dibuka
@@ -763,16 +764,32 @@ const checkAuthAndRoute = () => {
 
     document.getElementById('mainHeader')?.classList.remove('hidden');
     
-    if (currentUser.role === 'bendahara' || currentUser.role === 'super_admin') {
+    if (currentUser.role === 'super_admin') {
+        document.getElementById('headerTitle').innerHTML = 'PMII Sambas<br>Super Admin';
+        document.getElementById('bottomNav')?.classList.remove('hidden');
+        document.getElementById('navBtnBerita')?.classList.remove('hidden');
+        document.getElementById('navBtnUsers')?.classList.remove('hidden');
+        fetchKasUmum();
+        fetchKegiatan();
+        fetchBerita();
+        fetchUsersList();
+        showView('viewKasUmum');
+    } else if (currentUser.role === 'bendahara') {
         document.getElementById('headerTitle').innerHTML = 'PMII Sambas<br>Finance';
         document.getElementById('bottomNav')?.classList.remove('hidden');
+        document.getElementById('navBtnBerita')?.classList.add('hidden');
+        document.getElementById('navBtnUsers')?.classList.add('hidden');
+        fetchKasUmum();
+        fetchKegiatan();
         showView('viewKasUmum');
     } else if (currentUser.role === 'narator') {
         document.getElementById('headerTitle').innerHTML = 'PMII Sambas<br>Narator';
+        document.getElementById('bottomNav')?.classList.add('hidden');
         const greetingEl = document.getElementById('naratorGreeting');
         const badgeEl = document.getElementById('naratorUserBadge');
         if (greetingEl) greetingEl.textContent = `Halo, ${currentUser.username}`;
         if (badgeEl) badgeEl.textContent = `Narator Media & Informasi PMII`;
+        fetchBerita();
         showView('viewDashboardBerita');
     }
 };
@@ -1381,6 +1398,222 @@ window.hapusBerita = async (id) => {
     } catch (err) {
         console.error('Error deleting news:', err);
         Swal.fire('Error', 'Gagal menghapus berita: ' + (err.message || ''), 'error');
+    }
+};
+
+// ===================== USER MANAGEMENT (SUPER ADMIN) =====================
+const fetchUsersList = async () => {
+    if (!sql || currentUser?.role !== 'super_admin') return;
+    try {
+        const rows = await sql`SELECT id, username, role, created_at FROM users ORDER BY created_at ASC`;
+        usersList = rows;
+        renderUsersList();
+    } catch (e) {
+        console.error('Error fetching users:', e);
+    }
+};
+
+const renderUsersList = () => {
+    const container = document.getElementById('usersListContainer');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const countSA = usersList.filter(u => u.role === 'super_admin').length;
+    const countBen = usersList.filter(u => u.role === 'bendahara').length;
+    const countNar = usersList.filter(u => u.role === 'narator').length;
+
+    const elSA = document.getElementById('statCountSuperAdmin');
+    const elBen = document.getElementById('statCountBendahara');
+    const elNar = document.getElementById('statCountNarator');
+    const elTotal = document.getElementById('txtTotalUsersCount');
+
+    if (elSA) elSA.textContent = countSA;
+    if (elBen) elBen.textContent = countBen;
+    if (elNar) elNar.textContent = countNar;
+    if (elTotal) elTotal.textContent = `${usersList.length} Akun Terdaftar`;
+
+    if (usersList.length === 0) {
+        container.innerHTML = '<div class="text-center text-gray-400 py-10 italic text-sm">Belum ada akun pengguna.</div>';
+        return;
+    }
+
+    usersList.forEach(u => {
+        const isCurrent = currentUser?.username === u.username;
+        let roleBadge = '';
+        let roleIcon = '';
+        if (u.role === 'super_admin') {
+            roleBadge = '<span class="bg-amber-100 text-amber-800 border border-amber-200 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">Super Admin</span>';
+            roleIcon = '<i class="fa-solid fa-crown text-amber-500"></i>';
+        } else if (u.role === 'bendahara') {
+            roleBadge = '<span class="bg-blue-100 text-blue-800 border border-blue-200 text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider">Bendahara</span>';
+            roleIcon = '<i class="fa-solid fa-wallet text-blue-500"></i>';
+        } else {
+            roleBadge = '<span class="bg-purple-100 text-purple-800 border border-purple-200 text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider">Narator</span>';
+            roleIcon = '<i class="fa-solid fa-feather text-purple-500"></i>';
+        }
+
+        const card = document.createElement('div');
+        card.className = 'bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-3 transition hover:shadow-md';
+        card.innerHTML = `
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-11 h-11 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-center text-base">
+                        ${roleIcon}
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h4 class="font-extrabold text-gray-800 text-sm">${u.username}</h4>
+                            ${isCurrent ? '<span class="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold">Akun Anda</span>' : ''}
+                        </div>
+                        <p class="text-[11px] text-gray-400 mt-0.5"><i class="fa-regular fa-clock mr-1"></i>Dibuat: ${formatDate(u.created_at)}</p>
+                    </div>
+                </div>
+                <div>
+                    ${roleBadge}
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 border-t border-gray-50 pt-2.5">
+                <button onclick="window.changeUserPassword('${u.id}', '${u.username}')" class="text-xs px-3 py-1.5 rounded-lg bg-yellow-50 text-yellow-700 font-bold hover:bg-yellow-100 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-key"></i> Ubah Sandi
+                </button>
+                ${!isCurrent ? `
+                    <button onclick="window.deleteUserItem('${u.id}', '${u.username}')" class="text-xs px-3 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-trash-can"></i> Hapus
+                    </button>
+                ` : ''}
+            </div>
+        `;
+        container.appendChild(card);
+    });
+};
+
+const userFormModal = document.getElementById('userFormModal');
+const openAddUserModal = () => {
+    document.getElementById('inputUserId').value = '';
+    document.getElementById('inputUserUsername').value = '';
+    document.getElementById('inputUserPassword').value = '';
+    document.getElementById('inputUserRole').value = 'bendahara';
+    document.getElementById('userFormModalTitle').textContent = 'Tambah Akun Pengguna';
+    document.getElementById('inputUserUsername').disabled = false;
+    userFormModal?.classList.remove('hidden');
+    userFormModal?.classList.add('flex');
+};
+
+const closeUserModal = () => {
+    userFormModal?.classList.add('hidden');
+    userFormModal?.classList.remove('flex');
+    document.getElementById('userForm')?.reset();
+};
+
+document.getElementById('btnOpenAddUserModal')?.addEventListener('click', openAddUserModal);
+document.getElementById('btnCloseUserModal')?.addEventListener('click', closeUserModal);
+document.getElementById('btnCancelUser')?.addEventListener('click', closeUserModal);
+
+document.getElementById('userForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('inputUserId').value;
+    const username = document.getElementById('inputUserUsername').value.trim().toLowerCase();
+    const password = document.getElementById('inputUserPassword').value.trim();
+    const role = document.getElementById('inputUserRole').value;
+
+    if (!username || !password) {
+        Swal.fire('Perhatian', 'Username dan password wajib diisi', 'warning');
+        return;
+    }
+
+    const btn = document.getElementById('btnSaveUser');
+    const btnTxt = document.getElementById('btnSaveUserText');
+    const spinner = document.getElementById('spinnerSaveUser');
+
+    try {
+        btn.disabled = true;
+        btnTxt.textContent = 'Menyimpan...';
+        spinner.classList.remove('hidden');
+
+        if (id) {
+            // Update password & role
+            await sql`
+                UPDATE users
+                SET password = ${password}, role = ${role}
+                WHERE id = ${id}
+            `;
+            Swal.fire({ icon: 'success', title: 'Berhasil', text: `Akun ${username} berhasil diperbarui!`, timer: 1500, showConfirmButton: false });
+        } else {
+            // Check existing
+            const existing = await sql`SELECT id FROM users WHERE username = ${username}`;
+            if (existing.length > 0) {
+                Swal.fire('Error', `Username "${username}" sudah digunakan!`, 'error');
+                return;
+            }
+            // Insert
+            await sql`
+                INSERT INTO users (username, password, role)
+                VALUES (${username}, ${password}, ${role})
+            `;
+            Swal.fire({ icon: 'success', title: 'Berhasil', text: `Akun ${username} berhasil ditambahkan!`, timer: 1500, showConfirmButton: false });
+        }
+
+        closeUserModal();
+        await fetchUsersList();
+    } catch (err) {
+        console.error('Error saving user:', err);
+        Swal.fire('Error', 'Gagal menyimpan akun: ' + (err.message || ''), 'error');
+    } finally {
+        btn.disabled = false;
+        btnTxt.textContent = 'Simpan Akun';
+        spinner.classList.add('hidden');
+    }
+});
+
+window.changeUserPassword = async (userId, username) => {
+    const { value: newPassword } = await Swal.fire({
+        title: `Ubah Password: ${username}`,
+        input: 'password',
+        inputLabel: 'Masukkan Password Baru',
+        inputPlaceholder: 'Password baru',
+        showCancelButton: true,
+        confirmButtonText: 'Simpan',
+        cancelButtonText: 'Batal',
+        confirmButtonColor: '#3b82f6',
+        inputValidator: (value) => {
+            if (!value || value.length < 4) {
+                return 'Password minimal 4 karakter!';
+            }
+        }
+    });
+
+    if (newPassword) {
+        try {
+            await sql`UPDATE users SET password = ${newPassword} WHERE id = ${userId}`;
+            Swal.fire({ icon: 'success', title: 'Berhasil', text: `Password akun ${username} berhasil diubah!`, timer: 1500, showConfirmButton: false });
+        } catch (e) {
+            Swal.fire('Error', 'Gagal mengubah password: ' + (e.message || ''), 'error');
+        }
+    }
+};
+
+window.deleteUserItem = async (userId, username) => {
+    const result = await Swal.fire({
+        title: `Hapus Akun ${username}?`,
+        text: 'Akun ini tidak akan dapat digunakan lagi untuk login!',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#9ca3af',
+        confirmButtonText: 'Ya, Hapus!',
+        cancelButtonText: 'Batal'
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+        await sql`DELETE FROM users WHERE id = ${userId}`;
+        Swal.fire({ icon: 'success', title: 'Dihapus', text: `Akun ${username} berhasil dihapus!`, timer: 1500, showConfirmButton: false });
+        await fetchUsersList();
+    } catch (err) {
+        console.error('Error deleting user:', err);
+        Swal.fire('Error', 'Gagal menghapus user: ' + (err.message || ''), 'error');
     }
 };
 
