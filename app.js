@@ -1,9 +1,11 @@
 import { sql } from './neon-config.js';
 
 // ===================== STATE =====================
+let currentUser = JSON.parse(localStorage.getItem('pmii_user') || 'null');
 let kasTransactions = [];    // transaksi kas umum
 let kegiatanList = [];       // daftar kegiatan
 let kegTransactions = [];    // transaksi kegiatan aktif
+let beritaList = [];         // daftar berita
 let activeKegiatanId = null; // kegiatan yang sedang dibuka
 let activeKegiatanData = null;
 let currentImageBase64 = null;
@@ -650,32 +652,68 @@ document.getElementById('btnExportKegiatan').addEventListener('click', () => {
     generatePDF(activeKegiatanData.nama, kegTransactions, 'Semua Transaksi');
 });
 
-// ===================== ROUTING =====================
-const routeToLanding = () => {
-    document.getElementById('landingHeader').classList.remove('hidden');
+// ===================== AUTH & ROUTING =====================
+const checkAuthAndRoute = () => {
+    document.getElementById('landingHeader').classList.add('hidden');
     document.getElementById('mainHeader').classList.add('hidden');
     document.getElementById('detailHeader').classList.add('hidden');
     document.getElementById('bottomNav').classList.add('hidden');
-    showView('viewLanding');
-};
 
-const routeToApp = () => {
-    document.getElementById('landingHeader').classList.add('hidden');
+    if (!currentUser) {
+        document.getElementById('landingHeader').classList.remove('hidden');
+        showView('viewLanding');
+        return;
+    }
+
     document.getElementById('mainHeader').classList.remove('hidden');
-    document.getElementById('detailHeader').classList.add('hidden');
-    document.getElementById('bottomNav').classList.remove('hidden');
-    showView('viewKasUmum');
+    
+    if (currentUser.role === 'bendahara' || currentUser.role === 'super_admin') {
+        document.getElementById('bottomNav').classList.remove('hidden');
+        showView('viewKasUmum');
+    } else if (currentUser.role === 'narator') {
+        showView('viewDashboardBerita');
+    }
 };
 
-document.getElementById('btnGoToApp').addEventListener('click', () => {
-    routeToApp();
+document.getElementById('btnGoToLogin').addEventListener('click', () => {
+    document.getElementById('landingHeader').classList.add('hidden');
+    showView('viewLogin');
 });
 
 document.getElementById('btnBackToLanding').addEventListener('click', () => {
-    routeToLanding();
+    checkAuthAndRoute();
 });
 
-// ===================== BERITA LOGIC (Kept as requested) =====================
+document.getElementById('btnLogout').addEventListener('click', () => {
+    localStorage.removeItem('pmii_user');
+    currentUser = null;
+    checkAuthAndRoute();
+});
+
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const u = document.getElementById('loginUsername').value;
+    const p = document.getElementById('loginPassword').value;
+    
+    try {
+        Swal.showLoading();
+        const res = await sql`SELECT * FROM users WHERE username = ${u} AND password = ${p}`;
+        Swal.close();
+        
+        if (res && res.length > 0) {
+            currentUser = res[0];
+            localStorage.setItem('pmii_user', JSON.stringify(currentUser));
+            document.getElementById('loginForm').reset();
+            checkAuthAndRoute();
+        } else {
+            Swal.fire('Error', 'Username atau password salah', 'error');
+        }
+    } catch (err) {
+        Swal.fire('Error', 'Gagal menghubungi database', 'error');
+    }
+});
+
+// ===================== BERITA LOGIC =====================
 const fetchBerita = async () => {
     if (!sql) return;
     try {
@@ -775,8 +813,8 @@ const initDB = async () => {
 
 const init = async () => {
     await initDB();
-    await Promise.all([fetchKasUmum(), fetchKegiatanList()]);
-    routeToLanding();
+    await Promise.all([fetchKasUmum(), fetchKegiatanList(), fetchBerita()]);
+    checkAuthAndRoute();
 };
 
 init();
