@@ -57,6 +57,14 @@
                 </div>
             </div>
 
+            <!-- Filter Periode Dashboard -->
+            <div class="flex space-x-2 mb-4 overflow-x-auto no-scrollbar">
+                <button class="filter-btn active-filter text-xs font-bold px-4 py-1.5 rounded-full bg-primary text-white shadow-sm whitespace-nowrap transition" data-period="all">Semua</button>
+                <button class="filter-btn text-xs font-bold px-4 py-1.5 rounded-full bg-gray-100 text-gray-500 whitespace-nowrap transition" data-period="week">1 Minggu</button>
+                <button class="filter-btn text-xs font-bold px-4 py-1.5 rounded-full bg-gray-100 text-gray-500 whitespace-nowrap transition" data-period="month">1 Bulan</button>
+                <button class="filter-btn text-xs font-bold px-4 py-1.5 rounded-full bg-gray-100 text-gray-500 whitespace-nowrap transition" data-period="year">1 Tahun</button>
+            </div>
+
             <div class="flex justify-between items-center mb-4">
                 <h3 class="text-lg font-bold text-gray-700">Transaksi Terbaru</h3>
                 <button id="btnViewAll" class="text-primary text-sm font-semibold">Lihat Semua</button>
@@ -166,14 +174,16 @@
 
         <!-- ================= HISTORY VIEW ================= -->
         <section id="viewHistory" class="view-section">
-            <div class="flex justify-between items-center mb-4">
+            <div class="flex justify-between items-center mb-3">
                 <h2 class="text-xl font-bold text-gray-700">Riwayat Transaksi</h2>
-                <div class="flex space-x-2">
-                    <select id="filterBulan" class="text-xs border rounded p-1 bg-white focus:outline-none focus:ring-1 focus:ring-primary">
-                        <option value="all">Semua Bulan</option>
-                        <!-- Dynamic Options -->
-                    </select>
-                </div>
+            </div>
+
+            <!-- Filter Periode History -->
+            <div class="flex space-x-2 mb-4 overflow-x-auto no-scrollbar">
+                <button class="history-filter-btn active-filter text-xs font-bold px-4 py-1.5 rounded-full bg-primary text-white shadow-sm whitespace-nowrap transition" data-period="all">Semua</button>
+                <button class="history-filter-btn text-xs font-bold px-4 py-1.5 rounded-full bg-gray-100 text-gray-500 whitespace-nowrap transition" data-period="week">1 Minggu</button>
+                <button class="history-filter-btn text-xs font-bold px-4 py-1.5 rounded-full bg-gray-100 text-gray-500 whitespace-nowrap transition" data-period="month">1 Bulan</button>
+                <button class="history-filter-btn text-xs font-bold px-4 py-1.5 rounded-full bg-gray-100 text-gray-500 whitespace-nowrap transition" data-period="year">1 Tahun</button>
             </div>
 
             <!-- Full List -->

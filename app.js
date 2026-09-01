@@ -4,6 +4,8 @@ import { sql } from './neon-config.js';
 let transactions = [];
 let currentImageBase64 = null;
 let currentActiveTxId = null;
+let dashboardPeriod = 'all'; // all | week | month | year
+let historyPeriod = 'all';   // all | week | month | year
 
 // --- DOM Elements ---
 const views = document.querySelectorAll('.view-section');
@@ -51,6 +53,49 @@ const formatDate = (dateString) => {
     const options = { day: 'numeric', month: 'short', year: 'numeric' };
     return new Date(dateString).toLocaleDateString('id-ID', options);
 };
+
+// --- Filter Helper ---
+const filterByPeriod = (list, period) => {
+    if (period === 'all') return list;
+    const now = new Date();
+    now.setHours(23, 59, 59, 999);
+    let cutoff = new Date();
+    if (period === 'week') cutoff.setDate(now.getDate() - 7);
+    else if (period === 'month') cutoff.setMonth(now.getMonth() - 1);
+    else if (period === 'year') cutoff.setFullYear(now.getFullYear() - 1);
+    cutoff.setHours(0, 0, 0, 0);
+    return list.filter(tx => {
+        const d = new Date(tx.tanggal);
+        return d >= cutoff && d <= now;
+    });
+};
+
+const activateFilterBtn = (container, activeBtn) => {
+    container.querySelectorAll('button').forEach(b => {
+        b.classList.remove('bg-primary', 'text-white', 'shadow-sm', 'active-filter');
+        b.classList.add('bg-gray-100', 'text-gray-500');
+    });
+    activeBtn.classList.remove('bg-gray-100', 'text-gray-500');
+    activeBtn.classList.add('bg-primary', 'text-white', 'shadow-sm', 'active-filter');
+};
+
+// Dashboard filter buttons
+document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        dashboardPeriod = e.currentTarget.dataset.period;
+        activateFilterBtn(e.currentTarget.parentElement, e.currentTarget);
+        renderDashboard();
+    });
+});
+
+// History filter buttons
+document.querySelectorAll('.history-filter-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        historyPeriod = e.currentTarget.dataset.period;
+        activateFilterBtn(e.currentTarget.parentElement, e.currentTarget);
+        renderHistory();
+    });
+});
 
 // --- Navigation ---
 navBtns.forEach(btn => {
@@ -261,10 +306,11 @@ const fetchDataManual = async () => {
 
 // --- Render UI ---
 const renderDashboard = () => {
+    const filtered = filterByPeriod(transactions, dashboardPeriod);
     let totalIn = 0;
     let totalOut = 0;
 
-    transactions.forEach(tx => {
+    filtered.forEach(tx => {
         if (tx.type === 'in') totalIn += Number(tx.nominal);
         else totalOut += Number(tx.nominal);
     });
@@ -275,12 +321,12 @@ const renderDashboard = () => {
     txtTotalMasuk.textContent = formatRupiah(totalIn);
     txtTotalKeluar.textContent = formatRupiah(totalOut);
 
-    // Recent 5 transactions
+    // Recent 5 transactions (filtered)
     recentTxList.innerHTML = '';
-    const recent = transactions.slice(0, 5);
+    const recent = filtered.slice(0, 5);
     
     if (recent.length === 0) {
-        recentTxList.innerHTML = '<div class="text-center text-gray-400 py-4 italic text-sm">Belum ada transaksi</div>';
+        recentTxList.innerHTML = '<div class="text-center text-gray-400 py-4 italic text-sm">Tidak ada transaksi di periode ini</div>';
         return;
     }
 
@@ -290,13 +336,14 @@ const renderDashboard = () => {
 };
 
 const renderHistory = () => {
+    const filtered = filterByPeriod(transactions, historyPeriod);
     historyTxList.innerHTML = '';
-    if (transactions.length === 0) {
-        historyTxList.innerHTML = '<div class="text-center text-gray-400 py-10 italic">Belum ada transaksi</div>';
+    if (filtered.length === 0) {
+        historyTxList.innerHTML = '<div class="text-center text-gray-400 py-10 italic">Tidak ada transaksi di periode ini</div>';
         return;
     }
     
-    transactions.forEach(tx => {
+    filtered.forEach(tx => {
         historyTxList.appendChild(createTxElement(tx));
     });
 };
