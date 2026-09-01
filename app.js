@@ -560,7 +560,7 @@ const generatePDF = (title, txList, periodLabel) => {
         if (tx.type === 'in') totalIn += Number(tx.nominal); else totalOut += Number(tx.nominal);
         rows += `<tr>
             <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:center;font-size:11px">${i + 1}</td>
-            <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;font-size:11px">${tx.tanggal}</td>
+            <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;font-size:11px">${formatDate(tx.tanggal)}</td>
             <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;font-size:11px"><span style="color:${color};font-weight:bold">${jenis}</span></td>
             <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;font-size:11px">${tx.kategori}</td>
             <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;font-size:11px">${tx.judul}${tx.nama_kegiatan ? `<br><span style="color:#6366f1;font-size:9px">[Keg: ${tx.nama_kegiatan}]</span>` : ''}</td>
@@ -617,7 +617,7 @@ const generatePDF = (title, txList, periodLabel) => {
         filename,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true },
-        jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' }
+        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
     }).from(container).save().then(() => {
         container.style.display = 'none';
         container.innerHTML = '';
