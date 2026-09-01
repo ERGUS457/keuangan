@@ -839,82 +839,88 @@ const generateKuitansiPDF = async (tx) => {
     const container = document.getElementById('kuitansiTemplate');
     if (!container) return;
 
-    container.innerHTML = `
-        <div id="kuitansiPrintArea" style="font-family: Arial, Helvetica, sans-serif; width: 760px; padding: 24px 28px; color: #1e293b; background: #ffffff; border: 2.5px solid #1d4ed8; border-radius: 12px; position: relative; box-sizing: border-box; margin: 0 auto;">
+    const html = `
+        <div style="font-family: Arial, Helvetica, sans-serif; width: 100%; max-width: 680px; padding: 20px 24px; color: #1e293b; background: #ffffff; border: 2px solid #1d4ed8; border-radius: 10px; position: relative; box-sizing: border-box; margin: 0 auto;">
             <!-- Watermark Logo -->
-            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.08; pointer-events: none; text-align: center;">
-                <img src="./logo.jpg" style="width: 220px; height: 220px; object-fit: contain;">
+            <div style="position: absolute; top: 35px; left: 0; width: 100%; text-align: center; opacity: 0.07; pointer-events: none;">
+                <img src="./logo.jpg" style="width: 190px; height: 190px; object-fit: contain; display: inline-block;">
             </div>
 
             <!-- Kop Surat Kuitansi -->
-            <div style="display: flex; align-items: center; border-bottom: 2px solid #1d4ed8; padding-bottom: 12px; margin-bottom: 14px;">
-                <img src="./logo.jpg" style="width: 55px; height: 55px; object-fit: contain; margin-right: 14px; border-radius: 50%;">
-                <div style="flex: 1; text-align: center;">
-                    <h2 style="margin: 0; font-size: 13px; font-weight: 900; color: #1e3a8a; text-transform: uppercase; letter-spacing: 0.5px; line-height: 1.3;">PENGURUS CABANG PERGERAKAN MAHASISWA ISLAM INDONESIA</h2>
-                    <h3 style="margin: 3px 0 0 0; font-size: 12px; font-weight: 800; color: #1d4ed8; letter-spacing: 0.5px;">(PC PMII) KABUPATEN SAMBAS</h3>
-                    <p style="margin: 3px 0 0 0; font-size: 8.5px; color: #64748b;">Sekretariat: Jl. Raya Sejangkung, Desa Sebayan, Kec. Sambas &bull; WA: 0831-4006-3145</p>
-                </div>
-            </div>
+            <table style="width: 100%; border-collapse: collapse; border-bottom: 2px solid #1d4ed8; padding-bottom: 10px; margin-bottom: 12px;">
+                <tr>
+                    <td style="width: 55px; vertical-align: middle; padding-bottom: 10px;">
+                        <img src="./logo.jpg" style="width: 50px; height: 50px; object-fit: contain; border-radius: 50%;">
+                    </td>
+                    <td style="text-align: center; vertical-align: middle; padding-bottom: 10px;">
+                        <h2 style="margin: 0; font-size: 13px; font-weight: 900; color: #1e3a8a; text-transform: uppercase; letter-spacing: 0.5px; line-height: 1.2;">PENGURUS CABANG PERGERAKAN MAHASISWA ISLAM INDONESIA</h2>
+                        <h3 style="margin: 3px 0 0 0; font-size: 12px; font-weight: 800; color: #1d4ed8; letter-spacing: 0.5px;">(PC PMII) KABUPATEN SAMBAS</h3>
+                        <p style="margin: 3px 0 0 0; font-size: 8.5px; color: #64748b;">Sekretariat: Jl. Raya Sejangkung, Desa Sebayan, Kec. Sambas &bull; WA: 0831-4006-3145</p>
+                    </td>
+                </tr>
+            </table>
 
             <!-- Header Title & Nomor -->
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                <span style="background: #1d4ed8; color: #ffffff; padding: 4px 12px; border-radius: 6px; font-weight: 800; font-size: 10px; letter-spacing: 1px;">KUITANSI TANDA TERIMA</span>
-                <span style="font-size: 9.5px; font-weight: bold; color: #475569;">No: KWT/PC-PMII-SBS/${tahun}/${shortId}</span>
-            </div>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 12px;">
+                <tr>
+                    <td style="text-align: left;">
+                        <span style="background: #1d4ed8; color: #ffffff; padding: 4px 12px; border-radius: 5px; font-weight: 800; font-size: 10px; letter-spacing: 1px; display: inline-block;">KUITANSI TANDA TERIMA</span>
+                    </td>
+                    <td style="text-align: right; font-size: 9.5px; font-weight: bold; color: #475569;">
+                        No: KWT/PC-PMII-SBS/${tahun}/${shortId}
+                    </td>
+                </tr>
+            </table>
 
             <!-- Detail Data Kuitansi -->
             <table style="width: 100%; border-collapse: collapse; font-size: 10.5px; margin-bottom: 14px;">
                 <tr>
-                    <td style="width: 130px; padding: 6px 0; color: #475569; font-weight: bold;">Telah Diterima Dari</td>
-                    <td style="width: 12px; padding: 6px 0;">:</td>
-                    <td style="padding: 6px 0; font-weight: bold; color: #0f172a; border-bottom: 1px dotted #94a3b8;">${tx.judul}</td>
+                    <td style="width: 140px; padding: 5px 0; color: #475569; font-weight: bold;">Telah Diterima Dari</td>
+                    <td style="width: 15px; padding: 5px 0;">:</td>
+                    <td style="padding: 5px 0; font-weight: bold; color: #0f172a; border-bottom: 1px dotted #94a3b8;">${tx.judul}</td>
                 </tr>
                 <tr>
-                    <td style="padding: 6px 0; color: #475569; font-weight: bold;">Uang Sejumlah</td>
-                    <td style="padding: 6px 0;">:</td>
-                    <td style="padding: 6px 0; font-weight: bold; color: #1e3a8a; font-style: italic; border-bottom: 1px dotted #94a3b8; background: #f8fafc;">
+                    <td style="padding: 5px 0; color: #475569; font-weight: bold;">Uang Sejumlah</td>
+                    <td style="padding: 5px 0;">:</td>
+                    <td style="padding: 5px 0; font-weight: bold; color: #1e3a8a; font-style: italic; border-bottom: 1px dotted #94a3b8; background: #f8fafc;">
                         "${terbilangText}"
                     </td>
                 </tr>
                 <tr>
-                    <td style="padding: 6px 0; color: #475569; font-weight: bold;">Untuk Pembayaran</td>
-                    <td style="padding: 6px 0;">:</td>
-                    <td style="padding: 6px 0; color: #334155; border-bottom: 1px dotted #94a3b8;">${tx.catatan || tx.kategori || 'Penerimaan Kas PMII'}</td>
+                    <td style="padding: 5px 0; color: #475569; font-weight: bold;">Untuk Pembayaran</td>
+                    <td style="padding: 5px 0;">:</td>
+                    <td style="padding: 5px 0; color: #334155; border-bottom: 1px dotted #94a3b8;">${tx.catatan || tx.kategori || 'Penerimaan Kas PMII'}</td>
                 </tr>
                 <tr>
-                    <td style="padding: 6px 0; color: #475569; font-weight: bold;">Kategori Transaksi</td>
-                    <td style="padding: 6px 0;">:</td>
-                    <td style="padding: 6px 0; color: #334155; border-bottom: 1px dotted #94a3b8;">${tx.kategori}${tx.nama_kegiatan ? ` (Kegiatan: ${tx.nama_kegiatan})` : ''}</td>
+                    <td style="padding: 5px 0; color: #475569; font-weight: bold;">Kategori Transaksi</td>
+                    <td style="padding: 5px 0;">:</td>
+                    <td style="padding: 5px 0; color: #334155; border-bottom: 1px dotted #94a3b8;">${tx.kategori}${tx.nama_kegiatan ? ` (Kegiatan: ${tx.nama_kegiatan})` : ''}</td>
                 </tr>
             </table>
 
             <!-- Nominal & Tanda Tangan -->
-            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 14px;">
-                <div style="border: 2px solid #16a34a; background: #f0fdf4; padding: 8px 16px; border-radius: 8px; display: inline-block;">
-                    <div style="font-size: 8.5px; color: #15803d; font-weight: bold; text-transform: uppercase;">Jumlah Nominal</div>
-                    <div style="font-size: 15px; font-weight: 800; color: #15803d;">${formatRupiah(tx.nominal)}</div>
-                </div>
-
-                <div style="text-align: center; width: 170px;">
-                    <p style="margin: 0; font-size: 9.5px; color: #475569;">Sambas, ${formatDate(tx.tanggal)}</p>
-                    <p style="margin: 2px 0 0 0; font-size: 9.5px; font-weight: bold; color: #0f172a;">Bendahara Umum / Penerima,</p>
-                    <div style="height: 38px;"></div>
-                    <p style="margin: 0; font-size: 10.5px; font-weight: 800; color: #0f172a; text-decoration: underline;">GYARWIN SYARIF WIJAYA</p>
-                    <p style="margin: 0; font-size: 8.5px; color: #64748b;">PC PMII Kab. Sambas</p>
-                </div>
-            </div>
+            <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                <tr>
+                    <td style="vertical-align: bottom; text-align: left;">
+                        <div style="border: 2px solid #16a34a; background: #f0fdf4; padding: 6px 14px; border-radius: 8px; display: inline-block;">
+                            <div style="font-size: 8.5px; color: #15803d; font-weight: bold; text-transform: uppercase;">Jumlah Nominal</div>
+                            <div style="font-size: 15px; font-weight: 800; color: #15803d; margin-top: 2px;">${formatRupiah(tx.nominal)}</div>
+                        </div>
+                    </td>
+                    <td style="vertical-align: bottom; text-align: center; width: 200px;">
+                        <p style="margin: 0; font-size: 9.5px; color: #475569;">Sambas, ${formatDate(tx.tanggal)}</p>
+                        <p style="margin: 2px 0 0 0; font-size: 9.5px; font-weight: bold; color: #0f172a;">Bendahara Umum / Penerima,</p>
+                        <div style="height: 38px;"></div>
+                        <p style="margin: 0; font-size: 10.5px; font-weight: 800; color: #0f172a; text-decoration: underline;">GYARWIN SYARIF WIJAYA</p>
+                        <p style="margin: 0; font-size: 8.5px; color: #64748b;">PC PMII Kab. Sambas</p>
+                    </td>
+                </tr>
+            </table>
         </div>
     `;
 
-    // Make visible in fixed position behind modal
-    container.classList.remove('hidden');
+    container.innerHTML = html;
     container.style.display = 'block';
-    container.style.position = 'fixed';
-    container.style.top = '0';
-    container.style.left = '0';
-    container.style.width = '780px';
-    container.style.zIndex = '50';
-    container.style.background = '#ffffff';
 
     Swal.fire({
         title: 'Mempersiapkan Kuitansi...',
@@ -923,28 +929,16 @@ const generateKuitansiPDF = async (tx) => {
         didOpen: () => { Swal.showLoading(); }
     });
 
-    const targetEl = document.getElementById('kuitansiPrintArea') || container;
-
-    // Small delay to ensure browser paints fonts and DOM elements
-    await new Promise(r => setTimeout(r, 250));
-
     const opt = {
-        margin: [4, 4, 4, 4],
+        margin: [6, 6, 6, 6],
         filename: `Kuitansi-PMII-${(tx.judul || 'Iuran').replace(/[^a-zA-Z0-9]/g, '_')}-${shortId}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { 
-            scale: 2, 
-            useCORS: true, 
-            logging: false,
-            windowWidth: 800,
-            scrollX: 0,
-            scrollY: 0
-        },
+        html2canvas: { scale: 2, useCORS: true },
         jsPDF: { unit: 'mm', format: 'a5', orientation: 'landscape' }
     };
 
     try {
-        await html2pdf().set(opt).from(targetEl).save();
+        await html2pdf().set(opt).from(container).save();
         Swal.close();
         Swal.fire({
             icon: 'success',
@@ -958,7 +952,6 @@ const generateKuitansiPDF = async (tx) => {
         Swal.fire('Error', 'Gagal membuat kuitansi PDF: ' + err.message, 'error');
     } finally {
         container.style.display = 'none';
-        container.classList.add('hidden');
         container.innerHTML = '';
     }
 };
